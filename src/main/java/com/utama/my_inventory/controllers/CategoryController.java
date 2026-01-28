@@ -4,8 +4,8 @@ import com.utama.my_inventory.dtos.ApiResponseDTO;
 import com.utama.my_inventory.dtos.request.CategoryRequestDTO;
 import com.utama.my_inventory.dtos.response.CategoryResponseDTO;
 import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
-import com.utama.my_inventory.services.CategoryService;
-import com.utama.my_inventory.services.SubcategoryService;
+import com.utama.my_inventory.services.impl.CategoryServiceImpl;
+import com.utama.my_inventory.services.impl.SubcategoryServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,8 +25,8 @@ import java.util.List;
 @Tag(name = "Categorías", description = "API para gestión de categorías de productos")
 public class CategoryController {
 
-    private final CategoryService categoryService;
-    private final SubcategoryService subcategoryService;
+    private final CategoryServiceImpl categoryService;
+    private final SubcategoryServiceImpl subcategoryService;
 
     @PostMapping
     @Operation(

@@ -3,7 +3,7 @@ package com.utama.my_inventory.controllers;
 import com.utama.my_inventory.dtos.ApiResponseDTO;
 import com.utama.my_inventory.dtos.request.SubcategoryRequestDTO;
 import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
-import com.utama.my_inventory.services.SubcategoryService;
+import com.utama.my_inventory.services.impl.SubcategoryServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,7 +23,7 @@ import java.util.List;
 @Tag(name = "Subcategorías", description = "API para gestión de subcategorías de productos")
 public class SubcategoryController {
 
-    private final SubcategoryService subcategoryService;
+    private final SubcategoryServiceImpl subcategoryService;
 
     @PostMapping
     @Operation(
