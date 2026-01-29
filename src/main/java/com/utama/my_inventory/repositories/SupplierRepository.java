@@ -1,10 +1,9 @@
 package com.utama.my_inventory.repositories;
 
 import com.utama.my_inventory.entities.Supplier;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,18 +12,30 @@ import java.util.Optional;
 @Repository
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
-    Optional<Supplier> findByName(String name);
-
+    Optional<Supplier> findByIdAndActiveTrue(Long id);
     List<Supplier> findByActiveTrue();
+    List<Supplier> findByActiveTrueOrderByNameAsc();
 
-    Page<Supplier> findByActiveTrue(Pageable pageable);
+    Optional<Supplier> findByNameAndActiveTrue(String name);
+    List<Supplier> findByEmailAndActiveTrue(String email);
 
-    @Query("SELECT s FROM Supplier s WHERE s.active = true AND LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%'))")
-    List<Supplier> searchActiveSuppliers(String search);
+    List<Supplier> findByNameContainingIgnoreCaseAndActiveTrue(String name);
+    List<Supplier> findByContactPersonContainingIgnoreCaseAndActiveTrue(String contactPerson);
 
-    boolean existsByEmail(String email);
+    boolean existsByNameAndActiveTrue(String name);
+    boolean existsByNameAndIdNotAndActiveTrue(String name, Long id);
 
-    boolean existsByPhone(String phone);
+    @Query("SELECT s FROM Supplier s WHERE " +
+            "(:name IS NULL OR LOWER(s.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
+            "(:contactPerson IS NULL OR LOWER(s.contactPerson) LIKE LOWER(CONCAT('%', :contactPerson, '%'))) AND " +
+            "(:email IS NULL OR LOWER(s.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
+            "s.active = true")
+    List<Supplier> searchSuppliers(
+            @Param("name") String name,
+            @Param("contactPerson") String contactPerson,
+            @Param("email") String email);
 
-    long countByActiveTrue();
+
+    @Query("SELECT COUNT(s) FROM Supplier s WHERE s.active = true")
+    Long countActiveSuppliers();
 }
