@@ -88,7 +88,6 @@ public class MultimediaFile {
             case IMAGE -> IMAGE_EXTENSIONS.contains(ext);
             case VIDEO -> VIDEO_EXTENSIONS.contains(ext);
             case DOCUMENT -> DOCUMENT_EXTENSIONS.contains(ext);
-            case OTHER -> true;
         };
     }
 }
