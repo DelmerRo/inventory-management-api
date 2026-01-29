@@ -1,10 +1,11 @@
 package com.utama.my_inventory.controllers;
 
-import com.utama.my_inventory.dtos.BaseResponse;
 import com.utama.my_inventory.dtos.ExtendedBaseResponse;
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
 import com.utama.my_inventory.dtos.response.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.ProductSummaryResponseDTO;
+import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
+import com.utama.my_inventory.services.InventoryService;
 import com.utama.my_inventory.services.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class ProductController {
 
     private final ProductService productService;
+    private final InventoryService inventoryService;
 
     @PostMapping
     @Operation(summary = "Crear nuevo producto")
@@ -229,6 +231,17 @@ public class ProductController {
         );
 
         return ExtendedBaseResponse.ok(stats, "Estadísticas obtenidas")
+                .toResponseEntity();
+    }
+
+    @GetMapping("/{id}/inventory")
+    @Operation(summary = "Obtener historial de inventario de un producto")
+    public ResponseEntity<ExtendedBaseResponse<List<InventoryMovementResponseDTO>>> getProductInventoryHistory(
+            @Parameter(description = "ID del producto", example = "1")
+            @PathVariable Long id) {
+
+        List<InventoryMovementResponseDTO> history = inventoryService.getProductHistory(id);
+        return ExtendedBaseResponse.ok(history, "Historial de inventario obtenido")
                 .toResponseEntity();
     }
 }

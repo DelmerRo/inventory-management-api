@@ -1,4 +1,4 @@
-package com.utama.my_inventory.dtos.request;
+package com.utama.my_inventory.dtos.request.inventory;
 
 import com.utama.my_inventory.entities.enums.MovementType;
 import io.swagger.v3.oas.annotations.media.Schema;

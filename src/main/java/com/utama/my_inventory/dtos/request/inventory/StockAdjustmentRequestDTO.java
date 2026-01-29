@@ -1,4 +1,4 @@
-package com.utama.my_inventory.dtos.request;
+package com.utama.my_inventory.dtos.request.inventory;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
