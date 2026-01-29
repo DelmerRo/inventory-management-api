@@ -1,11 +1,11 @@
 package com.utama.my_inventory.controllers;
 
-import com.utama.my_inventory.dtos.ApiResponseDTO;
+import com.utama.my_inventory.dtos.ExtendedBaseResponse;
 import com.utama.my_inventory.dtos.request.CategoryRequestDTO;
 import com.utama.my_inventory.dtos.response.CategoryResponseDTO;
 import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
-import com.utama.my_inventory.services.impl.CategoryServiceImpl;
-import com.utama.my_inventory.services.impl.SubcategoryServiceImpl;
+import com.utama.my_inventory.services.CategoryService;
+import com.utama.my_inventory.services.SubcategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,122 +24,98 @@ import java.util.List;
 @Tag(name = "Categorías", description = "API para gestión de categorías de productos")
 public class CategoryController {
 
-    private final CategoryServiceImpl categoryService;
-    private final SubcategoryServiceImpl subcategoryService;
+    private final CategoryService categoryService;
+    private final SubcategoryService subcategoryService;
 
     @PostMapping
-    @Operation(
-            summary = "Crear nueva categoría",
-            description = "Crea una nueva categoría de productos"
-    )
+    @Operation(summary = "Crear nueva categoría")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Categoría creada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Datos de entrada inválidos"),
-            @ApiResponse(responseCode = "409", description = "Ya existe una categoría con ese nombre")
+            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+            @ApiResponse(responseCode = "409", description = "Categoría duplicada")
     })
-    public ResponseEntity<ApiResponseDTO<CategoryResponseDTO>> createCategory(
+    public ResponseEntity<ExtendedBaseResponse<CategoryResponseDTO>> createCategory(
             @Valid @RequestBody CategoryRequestDTO requestDTO) {
+
         CategoryResponseDTO category = categoryService.createCategory(requestDTO);
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponseDTO.success(category, "Categoría creada exitosamente"));
+        return ExtendedBaseResponse.created(category, "Categoría creada exitosamente")
+                .toResponseEntity();
     }
 
     @GetMapping
-    @Operation(
-            summary = "Listar todas las categorías",
-            description = "Obtiene una lista de todas las categorías activas"
-    )
-    @ApiResponse(responseCode = "200", description = "Lista de categorías obtenida exitosamente")
-    public ResponseEntity<ApiResponseDTO<List<CategoryResponseDTO>>> getAllCategories() {
+    @Operation(summary = "Listar todas las categorías")
+    public ResponseEntity<ExtendedBaseResponse<List<CategoryResponseDTO>>> getAllCategories() {
+
         List<CategoryResponseDTO> categories = categoryService.getAllCategories();
-        return ResponseEntity.ok(ApiResponseDTO.success(categories));
+        return ExtendedBaseResponse.ok(categories, "Categorías obtenidas correctamente")
+                .toResponseEntity();
     }
 
     @GetMapping("/{id}")
-    @Operation(
-            summary = "Obtener categoría por ID",
-            description = "Obtiene los detalles de una categoría específica"
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Categoría encontrada"),
-            @ApiResponse(responseCode = "404", description = "Categoría no encontrada")
-    })
-    public ResponseEntity<ApiResponseDTO<CategoryResponseDTO>> getCategoryById(
+    @Operation(summary = "Obtener categoría por ID")
+    public ResponseEntity<ExtendedBaseResponse<CategoryResponseDTO>> getCategoryById(
             @Parameter(description = "ID de la categoría", example = "1")
             @PathVariable Long id) {
+
         CategoryResponseDTO category = categoryService.getCategoryById(id);
-        return ResponseEntity.ok(ApiResponseDTO.success(category));
+        return ExtendedBaseResponse.ok(category, "Categoría encontrada")
+                .toResponseEntity();
     }
 
     @PutMapping("/{id}")
-    @Operation(
-            summary = "Actualizar categoría",
-            description = "Actualiza los datos de una categoría existente"
-    )
+    @Operation(summary = "Actualizar categoría existente")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Categoría actualizada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Datos de entrada inválidos"),
+            @ApiResponse(responseCode = "200", description = "Categoría actualizada"),
             @ApiResponse(responseCode = "404", description = "Categoría no encontrada"),
-            @ApiResponse(responseCode = "409", description = "Ya existe una categoría con ese nombre")
+            @ApiResponse(responseCode = "409", description = "Nombre duplicado")
     })
-    public ResponseEntity<ApiResponseDTO<CategoryResponseDTO>> updateCategory(
-            @Parameter(description = "ID de la categoría", example = "1")
+    public ResponseEntity<ExtendedBaseResponse<CategoryResponseDTO>> updateCategory(
             @PathVariable Long id,
             @Valid @RequestBody CategoryRequestDTO requestDTO) {
+
         CategoryResponseDTO category = categoryService.updateCategory(id, requestDTO);
-        return ResponseEntity.ok(ApiResponseDTO.success(category, "Categoría actualizada exitosamente"));
+        return ExtendedBaseResponse.ok(category, "Categoría actualizada exitosamente")
+                .toResponseEntity();
     }
 
     @DeleteMapping("/{id}")
-    @Operation(
-            summary = "Eliminar categoría",
-            description = "Elimina una categoría. No se puede eliminar si tiene subcategorías asociadas."
-    )
+    @Operation(summary = "Eliminar categoría")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Categoría eliminada exitosamente"),
+            @ApiResponse(responseCode = "200", description = "Categoría eliminada"),
             @ApiResponse(responseCode = "404", description = "Categoría no encontrada"),
-            @ApiResponse(responseCode = "409", description = "No se puede eliminar porque tiene subcategorías asociadas")
+            @ApiResponse(responseCode = "409", description = "No se puede eliminar, tiene subcategorías")
     })
-    public ResponseEntity<ApiResponseDTO<Void>> deleteCategory(
-            @Parameter(description = "ID de la categoría", example = "1")
+    public ResponseEntity<ExtendedBaseResponse<Void>> deleteCategory(
             @PathVariable Long id) {
+
         categoryService.deleteCategory(id);
-        return ResponseEntity
-                .status(HttpStatus.NO_CONTENT)
-                .body(ApiResponseDTO.success(null, "Categoría eliminada exitosamente"));
+        return ExtendedBaseResponse.<Void>ok(null, "Categoría eliminada exitosamente")
+                .toResponseEntity();
     }
 
     @GetMapping("/{id}/subcategories")
-    @Operation(
-            summary = "Obtener subcategorías de una categoría",
-            description = "Obtiene todas las subcategorías asociadas a una categoría específica"
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Subcategorías obtenidas exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Categoría no encontrada")
-    })
-    public ResponseEntity<ApiResponseDTO<List<SubcategoryResponseDTO>>> getSubcategoriesByCategory(
-            @Parameter(description = "ID de la categoría", example = "1")
+    @Operation(summary = "Obtener subcategorías de una categoría")
+    public ResponseEntity<ExtendedBaseResponse<List<SubcategoryResponseDTO>>> getSubcategoriesByCategory(
             @PathVariable Long id) {
-        List<SubcategoryResponseDTO> subcategories = subcategoryService.getSubcategoriesByCategoryId(id);
-        return ResponseEntity.ok(ApiResponseDTO.success(subcategories));
+
+        List<SubcategoryResponseDTO> subcategories =
+                subcategoryService.getSubcategoriesByCategoryId(id);
+
+        return ExtendedBaseResponse.ok(subcategories, "Subcategorías obtenidas correctamente")
+                .toResponseEntity();
     }
 
     @PatchMapping("/{id}/toggle-status")
-    @Operation(
-            summary = "Cambiar estado de categoría",
-            description = "Activa o desactiva una categoría (toggle)"
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Estado cambiado exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Categoría no encontrada")
-    })
-    public ResponseEntity<ApiResponseDTO<CategoryResponseDTO>> toggleCategoryStatus(
-            @Parameter(description = "ID de la categoría", example = "1")
+    @Operation(summary = "Activar/desactivar categoría")
+    public ResponseEntity<ExtendedBaseResponse<CategoryResponseDTO>> toggleCategoryStatus(
             @PathVariable Long id) {
+
         CategoryResponseDTO category = categoryService.toggleCategoryStatus(id);
-        String message = category.active() ? "Categoría activada" : "Categoría desactivada";
-        return ResponseEntity.ok(ApiResponseDTO.success(category, message));
+        String message = category.active()
+                ? "Categoría activada exitosamente"
+                : "Categoría desactivada exitosamente";
+
+        return ExtendedBaseResponse.ok(category, message)
+                .toResponseEntity();
     }
 }
