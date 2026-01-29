@@ -5,7 +5,10 @@ import com.utama.my_inventory.dtos.request.ProductRequestDTO;
 import com.utama.my_inventory.dtos.response.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.ProductSummaryResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
+import com.utama.my_inventory.dtos.response.multimedia.MultimediaFileResponseDTO;
+import com.utama.my_inventory.dtos.response.multimedia.MultimediaUploadResponseDTO;
 import com.utama.my_inventory.services.InventoryService;
+import com.utama.my_inventory.services.MultimediaService;
 import com.utama.my_inventory.services.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,8 +20,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,6 +38,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final InventoryService inventoryService;
+    private final MultimediaService multimediaService;
 
     @PostMapping
     @Operation(summary = "Crear nuevo producto")
@@ -242,6 +248,27 @@ public class ProductController {
 
         List<InventoryMovementResponseDTO> history = inventoryService.getProductHistory(id);
         return ExtendedBaseResponse.ok(history, "Historial de inventario obtenido")
+                .toResponseEntity();
+    }
+
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Subir imagen al producto")
+    public ResponseEntity<ExtendedBaseResponse<MultimediaUploadResponseDTO>> uploadProductImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+
+        MultimediaUploadResponseDTO result = multimediaService.uploadFile(id, file, "IMAGE");
+        return ExtendedBaseResponse.ok(result, "Imagen subida exitosamente")
+                .toResponseEntity();
+    }
+
+    @GetMapping("/{id}/images")
+    @Operation(summary = "Listar imágenes del producto")
+    public ResponseEntity<ExtendedBaseResponse<List<MultimediaFileResponseDTO>>> getProductImages(
+            @PathVariable Long id) {
+
+        List<MultimediaFileResponseDTO> images = multimediaService.getProductFilesByType(id, "IMAGE");
+        return ExtendedBaseResponse.ok(images, "Imágenes obtenidas correctamente")
                 .toResponseEntity();
     }
 }
