@@ -23,7 +23,6 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@SQLRestriction("active = true")
 public class Category {
 
     @Id

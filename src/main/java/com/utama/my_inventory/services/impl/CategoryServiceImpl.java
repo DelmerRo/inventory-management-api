@@ -98,7 +98,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "categories", key = "#id")
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponseDTO toggleCategoryStatus(Long id) {
         log.info("Toggling status for category with ID: {}", id);
 
