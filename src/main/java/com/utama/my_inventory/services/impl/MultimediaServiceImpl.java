@@ -57,7 +57,7 @@ public class MultimediaServiceImpl implements MultimediaService {
 
         try {
             // Configuración para Cloudinary
-            String folder = "uploads/products/" + productId;
+            String folder = "uploads/utama/products/" + productId;
             Map<String, Object> options = ObjectUtils.asMap(
                     "folder", folder,
                     "use_filename", true,

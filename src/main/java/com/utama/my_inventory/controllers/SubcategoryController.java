@@ -2,6 +2,7 @@ package com.utama.my_inventory.controllers;
 
 import com.utama.my_inventory.dtos.ExtendedBaseResponse;
 import com.utama.my_inventory.dtos.request.SubcategoryRequestDTO;
+import com.utama.my_inventory.dtos.response.CategoryResponseDTO;
 import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
 import com.utama.my_inventory.services.SubcategoryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -88,6 +89,20 @@ public class SubcategoryController {
 
         subcategoryService.deleteSubcategory(id);
         return ExtendedBaseResponse.<Void>ok(null, "Subcategoría eliminada exitosamente")
+                .toResponseEntity();
+    }
+
+    @PatchMapping("/{id}/toggle-status")
+    @Operation(summary = "Activar/desactivar subcategoría")
+    public ResponseEntity<ExtendedBaseResponse<SubcategoryResponseDTO>> toggleCategoryStatus(
+            @PathVariable Long id) {
+
+        SubcategoryResponseDTO subcategory = subcategoryService.toggleSubCategoryStatus(id);
+        String message = subcategory.active()
+                ? "Subcategoría activada exitosamente"
+                : "Subcategoría desactivada exitosamente";
+
+        return ExtendedBaseResponse.ok(subcategory, message)
                 .toResponseEntity();
     }
 }

@@ -36,6 +36,10 @@ public class Subcategory {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean active = true;
+
     @NotNull(message = "La categoría es obligatoria")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false,

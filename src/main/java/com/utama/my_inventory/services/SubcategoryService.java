@@ -17,4 +17,6 @@ public interface SubcategoryService {
     SubcategoryResponseDTO updateSubcategory(Long id, SubcategoryRequestDTO requestDTO);
 
     void deleteSubcategory(Long id);
+
+    SubcategoryResponseDTO toggleSubCategoryStatus(Long id);
 }

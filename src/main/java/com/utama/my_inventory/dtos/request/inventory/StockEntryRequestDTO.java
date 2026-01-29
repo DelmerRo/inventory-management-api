@@ -23,5 +23,10 @@ public record StockEntryRequestDTO(
         String reason,
 
         @Schema(description = "Costo unitario (opcional)", example = "25.50")
-        BigDecimal unitCost
+        BigDecimal unitCost,
+
+        @NotBlank(message = "Usuario es obligatorio")
+        @Size(max = 100, message = "Usuario no puede exceder 100 caracteres")
+        @Schema(description = "Nombre de la persona que agrego stock", example = "Jorge Diaz")
+        String user
 ) {}

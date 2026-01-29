@@ -19,6 +19,13 @@ public record SubcategoryRequestDTO(
         )
         String name,
 
+        @Schema(
+                description = "Estado activo de la subcategoría",
+                example = "true",
+                defaultValue = "true"
+        )
+        Boolean active,
+
         @NotNull(message = "El ID de la categoría es obligatorio")
         @Schema(
                 description = "ID de la categoría padre",

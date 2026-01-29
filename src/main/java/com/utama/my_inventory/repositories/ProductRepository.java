@@ -39,14 +39,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsBySkuAndIdNotAndActiveTrue(String sku, Long id);
 
     // Consultas personalizadas
-    @Query("SELECT p FROM Product p WHERE " +
-            "(:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
-            "(:sku IS NULL OR p.sku LIKE CONCAT('%', :sku, '%')) AND " +
-            "(:minPrice IS NULL OR p.salePrice >= :minPrice) AND " +
-            "(:maxPrice IS NULL OR p.salePrice <= :maxPrice) AND " +
-            "(:subcategoryId IS NULL OR p.subcategory.id = :subcategoryId) AND " +
-            "(:supplierId IS NULL OR p.supplier.id = :supplierId) AND " +
-            "p.active = true")
+    @Query("""
+    SELECT p FROM Product p WHERE
+    (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%'))) AND
+    (:sku IS NULL OR p.sku LIKE CONCAT('%', CAST(:sku AS string), '%')) AND
+    (:minPrice IS NULL OR p.salePrice >= :minPrice) AND
+    (:maxPrice IS NULL OR p.salePrice <= :maxPrice) AND
+    (:subcategoryId IS NULL OR p.subcategory.id = :subcategoryId) AND
+    (:supplierId IS NULL OR p.supplier.id = :supplierId) AND
+    p.active = true
+    """)
     List<Product> searchProducts(
             @Param("name") String name,
             @Param("sku") String sku,

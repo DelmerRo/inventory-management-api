@@ -1,6 +1,7 @@
 package com.utama.my_inventory.services.impl;
 
 import com.utama.my_inventory.dtos.request.SubcategoryRequestDTO;
+import com.utama.my_inventory.dtos.response.CategoryResponseDTO;
 import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
 import com.utama.my_inventory.entities.Category;
 import com.utama.my_inventory.entities.Subcategory;
@@ -120,6 +121,24 @@ public class SubcategoryServiceImpl implements SubcategoryService {
         subcategoryRepository.delete(subcategory);
         log.info("Subcategory deleted with ID: {}", id);
     }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "subcategories", allEntries = true)
+    public SubcategoryResponseDTO toggleSubCategoryStatus(Long id) {
+        log.info("Toggling status for subcategory with ID: {}", id);
+
+        Subcategory subcategory = subcategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("subcategory not found"));
+
+        subcategory.setActive(!subcategory.getActive());
+        Subcategory updatedSubCategory = subcategoryRepository.save(subcategory);
+
+        String status = updatedSubCategory.getActive() ? "activated" : "deactivated";
+        log.info("SubCategory {} with ID: {}", status, id);
+        return subcategoryMapper.toResponseDTO(updatedSubCategory);
+    }
+
 
     // ========== PRIVATE HELPER METHODS ==========
 

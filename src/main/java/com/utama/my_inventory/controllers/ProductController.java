@@ -2,6 +2,8 @@ package com.utama.my_inventory.controllers;
 
 import com.utama.my_inventory.dtos.ExtendedBaseResponse;
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
+import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
+import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
 import com.utama.my_inventory.dtos.response.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.ProductSummaryResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
@@ -192,35 +194,32 @@ public class ProductController {
                 .toResponseEntity();
     }
 
-    @PostMapping("/{id}/add-stock")
+    @PostMapping("/add-stock")
     @Operation(summary = "Agregar stock a producto")
     public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> addStock(
-            @PathVariable Long id,
-            @RequestBody Map<String, Object> request) {
+            @Valid @RequestBody StockEntryRequestDTO request) {
 
-        int quantity = (Integer) request.get("quantity");
-        String reason = (String) request.get("reason");
-        String user = (String) request.get("user");
-
-        ProductResponseDTO product = productService.addStock(id, quantity, reason, user);
+        ProductResponseDTO product = productService.addStock(
+                request.productId(), request.quantity(), request.reason(), request.user());
         return ExtendedBaseResponse.ok(product, "Stock agregado exitosamente")
                 .toResponseEntity();
     }
 
-    @PostMapping("/{id}/remove-stock")
-    @Operation(summary = "Remover stock de producto")
+    @PostMapping("/remove-stock")
     public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> removeStock(
-            @PathVariable Long id,
-            @RequestBody Map<String, Object> request) {
+            @Valid @RequestBody StockExitRequestDTO request) {
 
-        int quantity = (Integer) request.get("quantity");
-        String reason = (String) request.get("reason");
-        String user = (String) request.get("user");
+        ProductResponseDTO product = productService.removeStock(
+                request.productId(),
+                request.quantity(),
+                request.reason(),
+                request.user()
+        );
 
-        ProductResponseDTO product = productService.removeStock(id, quantity, reason, user);
         return ExtendedBaseResponse.ok(product, "Stock removido exitosamente")
                 .toResponseEntity();
     }
+
 
     @GetMapping("/statistics")
     @Operation(summary = "Obtener estadísticas de productos")

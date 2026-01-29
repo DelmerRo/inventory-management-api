@@ -8,16 +8,21 @@ import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryOperationResponseDTO;
+import com.utama.my_inventory.entities.enums.MovementType;
+import com.utama.my_inventory.exceptions.BadRequestException;
 import com.utama.my_inventory.services.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -123,20 +128,56 @@ public class InventoryController {
     @GetMapping("/search")
     @Operation(summary = "Buscar movimientos con filtros")
     public ResponseEntity<ExtendedBaseResponse<List<InventoryMovementResponseDTO>>> searchMovements(
-            @Parameter(description = "ID del producto") @RequestParam(required = false) Long productId,
+
+            @Parameter(description = "ID del producto")
+            @RequestParam(required = false) Long productId,
+
             @Parameter(description = "Tipo de movimiento (ENTRADA/SALIDA/AJUSTE)")
             @RequestParam(required = false) String movementType,
-            @Parameter(description = "Usuario que registró") @RequestParam(required = false) String registeredBy,
-            @Parameter(description = "Fecha inicio (YYYY-MM-DDTHH:MM:SS)")
+
+            @Parameter(description = "Usuario que registró")
+            @RequestParam(required = false) String registeredBy,
+
+            @Parameter(description = "Fecha inicio")
             @RequestParam(required = false) LocalDateTime startDate,
-            @Parameter(description = "Fecha fin (YYYY-MM-DDTHH:MM:SS)")
+
+            @Parameter(description = "Fecha fin")
             @RequestParam(required = false) LocalDateTime endDate) {
 
-        List<InventoryMovementResponseDTO> movements = inventoryService.searchMovements(
-                productId, movementType, registeredBy, startDate, endDate);
+        MovementType type = null;
+
+        if (StringUtils.hasText(movementType)) {
+            try {
+                type = MovementType.valueOf(movementType.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException(
+                        "Tipo de movimiento inválido. Use: ENTRADA, SALIDA o AJUSTE"
+                );
+            }
+        }
+
+        String registeredByClean = StringUtils.hasText(registeredBy)
+                ? registeredBy.trim()
+                : null;
+
+        List<InventoryMovementResponseDTO> movements =
+                inventoryService.searchMovements(
+                        productId,
+                        type,
+                        registeredByClean,
+                        startDate,
+                        endDate
+                );
 
         return ExtendedBaseResponse.ok(movements, "Búsqueda completada")
                 .toResponseEntity();
+    }
+
+    private String validateMovementType(String movementType) {
+        if (movementType == null || movementType.trim().isEmpty() || "null".equalsIgnoreCase(movementType)) {
+            return null;
+        }
+        return movementType.trim();
     }
 
     @GetMapping("/type/{movementType}")
