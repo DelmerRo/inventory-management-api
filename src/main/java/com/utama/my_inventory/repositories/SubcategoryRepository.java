@@ -25,4 +25,6 @@ public interface SubcategoryRepository extends JpaRepository<Subcategory, Long> 
 
     @Query("SELECT s FROM Subcategory s WHERE s.id = :id AND s.category.active = true")
     Optional<Subcategory> findByIdWithActiveCategory(@Param("id") Long id);
+
+    Optional<Subcategory> findByNameAndCategoryName(String name, String categoryName);
 }

@@ -4,10 +4,14 @@ import com.utama.my_inventory.dtos.request.ProductRequestDTO;
 import com.utama.my_inventory.dtos.response.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.ProductSummaryResponseDTO;
 import com.utama.my_inventory.entities.Product;
+import com.utama.my_inventory.entities.Subcategory;
+import com.utama.my_inventory.entities.Supplier;
 import com.utama.my_inventory.exceptions.BusinessException;
 import com.utama.my_inventory.exceptions.ResourceNotFoundException;
 import com.utama.my_inventory.mapper.ProductMapper;
 import com.utama.my_inventory.repositories.ProductRepository;
+import com.utama.my_inventory.repositories.SubcategoryRepository;
+import com.utama.my_inventory.repositories.SupplierRepository;
 import com.utama.my_inventory.services.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,21 +30,42 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final SubcategoryRepository subcategoryRepository;
+    private final SupplierRepository supplierRepository;
+
 
     @Override
     @Transactional
     @CacheEvict(value = {"products", "productSummary"}, allEntries = true)
     public ProductResponseDTO createProduct(ProductRequestDTO requestDTO) {
+
         log.info("Creating new product with SKU: {}", requestDTO.sku());
 
         validateUniqueSku(requestDTO.sku());
+        validatePricing(requestDTO.costPrice(), requestDTO.salePrice());
 
         Product product = productMapper.toEntity(requestDTO);
+
+        Subcategory subcategory = subcategoryRepository.findById(requestDTO.subcategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Subcategory not found with ID: " + requestDTO.subcategoryId()
+                ));
+
+        Supplier supplier = supplierRepository.findById(requestDTO.supplierId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Supplier not found with ID: " + requestDTO.supplierId()
+                ));
+
+        product.setSubcategory(subcategory);
+        product.setSupplier(supplier);
+
         Product savedProduct = productRepository.save(product);
 
         log.info("Product created with ID: {} and SKU: {}", savedProduct.getId(), savedProduct.getSku());
+
         return productMapper.toResponseDTO(savedProduct);
     }
+
 
     @Override
     @Transactional(readOnly = true)

@@ -16,10 +16,13 @@ import com.utama.my_inventory.mapper.InventoryMovementMapper;
 import com.utama.my_inventory.repositories.InventoryMovementRepository;
 import com.utama.my_inventory.repositories.ProductRepository;
 import com.utama.my_inventory.services.InventoryService;
+import com.utama.my_inventory.utils.InventoryMovementSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -205,28 +208,29 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<InventoryMovementResponseDTO> searchMovements(Long productId, String movementType,
-                                                              String registeredBy, LocalDateTime startDate,
-                                                              LocalDateTime endDate) {
-        log.info("Searching movements with filters - productId: {}, movementType: {}, registeredBy: {}",
-                productId, movementType, registeredBy);
+    public List<InventoryMovementResponseDTO> searchMovements(
+            Long productId,
+            MovementType movementType,
+            String registeredBy,
+            LocalDateTime startDate,
+            LocalDateTime endDate) {
 
-        MovementType type = null;
-        if (movementType != null && !movementType.trim().isEmpty()) {
-            try {
-                type = MovementType.valueOf(movementType.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException("Tipo de movimiento inválido: " + movementType);
-            }
-        }
+        Specification<InventoryMovement> spec =
+                InventoryMovementSpecification.filter(
+                        productId,
+                        movementType,
+                        registeredBy,
+                        startDate,
+                        endDate
+                );
 
-        List<InventoryMovement> movements = movementRepository.searchMovements(
-                productId, type, registeredBy, startDate, endDate);
-
-        return movements.stream()
+        return movementRepository.findAll(spec)
+                .stream()
                 .map(movementMapper::toResponseDTO)
                 .toList();
     }
+
+
 
     @Override
     @Transactional(readOnly = true)

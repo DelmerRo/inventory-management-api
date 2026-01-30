@@ -15,6 +15,9 @@ public record SubcategoryResponseDTO(
         @Schema(description = "Nombre de la subcategoría", example = "Smartphones")
         String name,
 
+        @Schema(description = "Estado activo", example = "true")
+        Boolean active,
+
         @Schema(description = "ID de la categoría padre", example = "1")
         Long categoryId,
 

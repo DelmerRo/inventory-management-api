@@ -7,6 +7,7 @@ import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryOperationResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryStatisticsResponseDTO;
+import com.utama.my_inventory.entities.enums.MovementType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +26,7 @@ public interface InventoryService {
     InventoryOperationResponseDTO registerAdjustment(StockAdjustmentRequestDTO requestDTO, String currentUser);
 
     // Búsquedas avanzadas
-    List<InventoryMovementResponseDTO> searchMovements(Long productId, String movementType,
+    List<InventoryMovementResponseDTO> searchMovements(Long productId, MovementType movementType,
                                                        String registeredBy, LocalDateTime startDate,
                                                        LocalDateTime endDate);
 

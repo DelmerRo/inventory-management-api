@@ -18,6 +18,7 @@ public interface SubcategoryMapper {
     @Mapping(target = "products", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "active", ignore = true)
     Subcategory toEntity(SubcategoryRequestDTO dto);
 
     @Mapping(target = "categoryId", source = "category.id")
