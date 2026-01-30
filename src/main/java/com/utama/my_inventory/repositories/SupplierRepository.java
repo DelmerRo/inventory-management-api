@@ -17,13 +17,8 @@ public interface SupplierRepository extends JpaRepository<Supplier, Long> {
     List<Supplier> findByActiveTrueOrderByNameAsc();
 
     Optional<Supplier> findByNameAndActiveTrue(String name);
-    List<Supplier> findByEmailAndActiveTrue(String email);
-
-    List<Supplier> findByNameContainingIgnoreCaseAndActiveTrue(String name);
-    List<Supplier> findByContactPersonContainingIgnoreCaseAndActiveTrue(String contactPerson);
 
     boolean existsByNameAndActiveTrue(String name);
-    boolean existsByNameAndIdNotAndActiveTrue(String name, Long id);
 
     @Query("SELECT s FROM Supplier s WHERE " +
             "(:name IS NULL OR LOWER(s.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +

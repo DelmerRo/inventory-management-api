@@ -24,16 +24,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findBySupplierIdAndActiveTrue(Long supplierId);
     List<Product> findBySubcategoryCategoryIdAndActiveTrue(Long categoryId);
 
-    // Búsquedas por stock
-    List<Product> findByCurrentStockGreaterThanAndActiveTrue(int stock);
-    List<Product> findByCurrentStockLessThanAndActiveTrue(int stock);
-    List<Product> findByCurrentStockEqualsAndActiveTrue(int stock);
-
-    // Búsquedas por precio
-    List<Product> findBySalePriceBetweenAndActiveTrue(BigDecimal minPrice, BigDecimal maxPrice);
-    List<Product> findBySalePriceGreaterThanEqualAndActiveTrue(BigDecimal minPrice);
-    List<Product> findBySalePriceLessThanEqualAndActiveTrue(BigDecimal maxPrice);
-
     // Validaciones
     boolean existsBySkuAndActiveTrue(String sku);
     boolean existsBySkuAndIdNotAndActiveTrue(String sku, Long id);

@@ -17,29 +17,8 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
     // Métodos simples que Spring Data genera automáticamente
     List<InventoryMovement> findByProductIdOrderByMovementDateDesc(Long productId);
     List<InventoryMovement> findByMovementTypeOrderByMovementDateDesc(MovementType movementType);
-    List<InventoryMovement> findByRegisteredByContainingIgnoreCaseOrderByMovementDateDesc(String registeredBy);
     List<InventoryMovement> findByMovementDateBetweenOrderByMovementDateDesc(LocalDateTime startDate, LocalDateTime endDate);
     List<InventoryMovement> findAllByOrderByMovementDateDesc();
-
-    @Query("""
-SELECT im FROM InventoryMovement im 
-WHERE 
-    (:productId IS NULL OR im.product.id = :productId) AND
-    (:movementType IS NULL OR im.movementType = :movementType) AND
-    (:registeredBy IS NULL OR 
-        LOWER(im.registeredBy) LIKE LOWER(CONCAT('%', CAST(:registeredBy AS string), '%'))
-    ) AND
-    (:startDate IS NULL OR im.movementDate >= CAST(:startDate AS timestamp)) AND
-    (:endDate IS NULL OR im.movementDate <= CAST(:endDate AS timestamp))
-ORDER BY im.movementDate DESC
-""")
-    List<InventoryMovement> searchMovements(
-            Long productId,
-            MovementType movementType,
-            String registeredBy,
-            LocalDateTime startDate,
-            LocalDateTime endDate
-    );
 
     // Estadísticas
     @Query("SELECT COALESCE(SUM(im.quantity), 0) FROM InventoryMovement im WHERE " +

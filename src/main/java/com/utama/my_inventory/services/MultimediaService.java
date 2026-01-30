@@ -26,11 +26,7 @@ public interface MultimediaService {
     boolean isValidFileSize(MultipartFile file);
     boolean isValidFileName(String fileName);
 
-    // Transformaciones
-    MultimediaFileResponseDTO toResponseDTOWithMetadata(Long fileId);
-
     // Cloudinary operations
-    Map<String, Object> uploadToCloudinary(MultipartFile file, String folder);
     Map<String, Object> getCloudinaryFileInfo(String publicId);
     void deleteFromCloudinary(String publicId);
 }

@@ -126,58 +126,18 @@ public class InventoryController {
     }
 
     @GetMapping("/search")
-    @Operation(summary = "Buscar movimientos con filtros")
     public ResponseEntity<ExtendedBaseResponse<List<InventoryMovementResponseDTO>>> searchMovements(
-
-            @Parameter(description = "ID del producto")
             @RequestParam(required = false) Long productId,
-
-            @Parameter(description = "Tipo de movimiento (ENTRADA/SALIDA/AJUSTE)")
-            @RequestParam(required = false) String movementType,
-
-            @Parameter(description = "Usuario que registró")
+            @RequestParam(required = false) MovementType movementType,
             @RequestParam(required = false) String registeredBy,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
 
-            @Parameter(description = "Fecha inicio")
-            @RequestParam(required = false) LocalDateTime startDate,
+        MovementFilter filter = new MovementFilter(productId, movementType, registeredBy, startDate, endDate);
 
-            @Parameter(description = "Fecha fin")
-            @RequestParam(required = false) LocalDateTime endDate) {
+        var movements = inventoryService.searchMovements(filter);
 
-        MovementType type = null;
-
-        if (StringUtils.hasText(movementType)) {
-            try {
-                type = MovementType.valueOf(movementType.trim().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BadRequestException(
-                        "Tipo de movimiento inválido. Use: ENTRADA, SALIDA o AJUSTE"
-                );
-            }
-        }
-
-        String registeredByClean = StringUtils.hasText(registeredBy)
-                ? registeredBy.trim()
-                : null;
-
-        List<InventoryMovementResponseDTO> movements =
-                inventoryService.searchMovements(
-                        productId,
-                        type,
-                        registeredByClean,
-                        startDate,
-                        endDate
-                );
-
-        return ExtendedBaseResponse.ok(movements, "Búsqueda completada")
-                .toResponseEntity();
-    }
-
-    private String validateMovementType(String movementType) {
-        if (movementType == null || movementType.trim().isEmpty() || "null".equalsIgnoreCase(movementType)) {
-            return null;
-        }
-        return movementType.trim();
+        return ExtendedBaseResponse.ok(movements, "Búsqueda completada").toResponseEntity();
     }
 
     @GetMapping("/type/{movementType}")

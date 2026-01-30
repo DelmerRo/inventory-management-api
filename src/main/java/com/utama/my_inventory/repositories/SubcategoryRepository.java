@@ -12,19 +12,10 @@ import java.util.Optional;
 @Repository
 public interface SubcategoryRepository extends JpaRepository<Subcategory, Long> {
 
-    Optional<Subcategory> findByCategoryIdAndName(Long categoryId, String name);
 
     List<Subcategory> findByCategoryId(Long categoryId);
 
-    List<Subcategory> findByCategoryActiveTrue();
-
-    @Query("SELECT s FROM Subcategory s WHERE s.category.id = :categoryId AND s.category.active = true")
-    List<Subcategory> findByActiveCategoryId(Long categoryId);
-
     boolean existsByCategoryIdAndName(Long categoryId, String name);
-
-    @Query("SELECT s FROM Subcategory s WHERE s.id = :id AND s.category.active = true")
-    Optional<Subcategory> findByIdWithActiveCategory(@Param("id") Long id);
 
     Optional<Subcategory> findByNameAndCategoryName(String name, String categoryName);
 }

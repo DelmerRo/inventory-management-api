@@ -20,14 +20,12 @@ public interface ProductService {
 
     List<ProductResponseDTO> getProductsBySubcategory(Long subcategoryId);
     List<ProductResponseDTO> getProductsBySupplier(Long supplierId);
-    List<ProductResponseDTO> getProductsByCategory(Long categoryId);
     List<ProductResponseDTO> getLowStockProducts(int threshold);
     List<ProductResponseDTO> searchProducts(String name, String sku, BigDecimal minPrice,
                                             BigDecimal maxPrice, Long subcategoryId, Long supplierId);
 
     ProductResponseDTO addStock(Long productId, int quantity, String reason, String user);
     ProductResponseDTO removeStock(Long productId, int quantity, String reason, String user);
-    ProductResponseDTO updateStock(Long productId, int newStock, String reason, String user);
 
     Long getTotalProductCount();
     Long getTotalStock();

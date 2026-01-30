@@ -1,55 +1,43 @@
 package com.utama.my_inventory.utils;
 
+import com.utama.my_inventory.dtos.request.MovementFilter;
 import com.utama.my_inventory.entities.InventoryMovement;
-import com.utama.my_inventory.entities.enums.MovementType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
-
-import java.time.LocalDateTime;
+import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 
 public class InventoryMovementSpecification {
 
-    public static Specification<InventoryMovement> filter(
-            Long productId,
-            MovementType movementType,
-            String registeredBy,
-            LocalDateTime startDate,
-            LocalDateTime endDate
-    ) {
-
+    public static Specification<InventoryMovement> filter(MovementFilter f) {
         return (root, query, cb) -> {
-
             List<Predicate> predicates = new ArrayList<>();
 
-            if (productId != null) {
-                predicates.add(cb.equal(root.get("product").get("id"), productId));
+            if (f.productId() != null) {
+                predicates.add(cb.equal(root.get("product").get("id"), f.productId()));
             }
 
-            if (movementType != null) {
-                predicates.add(cb.equal(root.get("movementType"), movementType));
+            if (f.movementType() != null) {
+                predicates.add(cb.equal(root.get("movementType"), f.movementType()));
             }
 
-            if (registeredBy != null && !registeredBy.isBlank()) {
-                predicates.add(
-                        cb.like(
-                                cb.lower(root.get("registeredBy")),
-                                "%" + registeredBy.toLowerCase() + "%"
-                        )
-                );
+            if (StringUtils.hasText(f.registeredBy())) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("registeredBy")),
+                        "%" + f.registeredBy().trim().toLowerCase() + "%"
+                ));
             }
 
-            if (startDate != null) {
-                predicates.add(cb.greaterThanOrEqualTo(
-                        root.get("movementDate"), startDate));
+            if (f.startDate() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("movementDate"), f.startDate()));
             }
 
-            if (endDate != null) {
-                predicates.add(cb.lessThanOrEqualTo(
-                        root.get("movementDate"), endDate));
+            if (f.endDate() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("movementDate"), f.endDate()));
             }
 
+            // El ordenamiento se puede definir aquí o pasar por el repositorio
             query.orderBy(cb.desc(root.get("movementDate")));
 
             return cb.and(predicates.toArray(new Predicate[0]));

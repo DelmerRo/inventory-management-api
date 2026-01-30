@@ -1,12 +1,12 @@
 package com.utama.my_inventory.services.impl;
 
+import com.utama.my_inventory.dtos.request.MovementFilter;
 import com.utama.my_inventory.dtos.request.inventory.InventoryMovementRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockAdjustmentRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryOperationResponseDTO;
-import com.utama.my_inventory.dtos.response.inventory.InventoryStatisticsResponseDTO;
 import com.utama.my_inventory.entities.InventoryMovement;
 import com.utama.my_inventory.entities.Product;
 import com.utama.my_inventory.entities.enums.MovementType;
@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -208,29 +207,15 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<InventoryMovementResponseDTO> searchMovements(
-            Long productId,
-            MovementType movementType,
-            String registeredBy,
-            LocalDateTime startDate,
-            LocalDateTime endDate) {
+    public List<InventoryMovementResponseDTO> searchMovements(MovementFilter filter) {
 
-        Specification<InventoryMovement> spec =
-                InventoryMovementSpecification.filter(
-                        productId,
-                        movementType,
-                        registeredBy,
-                        startDate,
-                        endDate
-                );
+        Specification<InventoryMovement> spec = InventoryMovementSpecification.filter(filter);
 
         return movementRepository.findAll(spec)
                 .stream()
                 .map(movementMapper::toResponseDTO)
                 .toList();
     }
-
-
 
     @Override
     @Transactional(readOnly = true)
@@ -287,26 +272,6 @@ public class InventoryServiceImpl implements InventoryService {
     @Transactional(readOnly = true)
     public Long getMovementCountByProduct(Long productId) {
         return movementRepository.countMovementsByProduct(productId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Object[]> getMonthlyMovementSummary(int year, int month) {
-        log.info("Generating monthly movement summary for {}/{}", month, year);
-
-        // Implementar consulta personalizada si es necesario
-        // Por ahora retornamos una lista vacía
-        return List.of();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Object[]> getProductMovementSummary(Long productId) {
-        log.info("Generating product movement summary for ID: {}", productId);
-
-        // Implementar consulta personalizada si es necesario
-        // Por ahora retornamos una lista vacía
-        return List.of();
     }
 
     // ========== PRIVATE HELPER METHODS ==========
