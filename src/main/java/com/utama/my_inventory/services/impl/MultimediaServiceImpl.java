@@ -263,49 +263,6 @@ public class MultimediaServiceImpl implements MultimediaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public MultimediaFileResponseDTO toResponseDTOWithMetadata(Long fileId) {
-        MultimediaFile file = fileRepository.findById(fileId)
-                .orElseThrow(() -> new ResourceNotFoundException("Archivo no encontrado"));
-
-        MultimediaFileResponseDTO response = fileMapper.toResponseDTO(file);
-
-        // Obtener metadata adicional de Cloudinary si es necesario
-        if (file.getFileUrl().contains("cloudinary.com")) {
-            try {
-                String publicId = extractPublicIdFromUrl(file.getFileUrl());
-                Map<String, Object> metadata = getCloudinaryFileInfo(publicId);
-                log.debug("Cloudinary metadata for file {}: {}", fileId, metadata);
-            } catch (Exception e) {
-                log.warn("Could not fetch Cloudinary metadata: {}", e.getMessage());
-            }
-        }
-
-        return response;
-    }
-
-    @Override
-    public Map<String, Object> uploadToCloudinary(MultipartFile file, String folder) {
-        try {
-            Map<String, Object> options = ObjectUtils.asMap(
-                    "folder", folder,
-                    "use_filename", true,
-                    "unique_filename", false,
-                    "overwrite", true,
-                    "resource_type", "auto"
-            );
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
-            return uploadResult;
-
-        } catch (Exception e) {
-            log.error("Error uploading to Cloudinary: {}", e.getMessage());
-            throw new BusinessException("Error al subir archivo a Cloudinary: " + e.getMessage());
-        }
-    }
-
-    @Override
     public Map<String, Object> getCloudinaryFileInfo(String publicId) {
         try {
             @SuppressWarnings("unchecked")

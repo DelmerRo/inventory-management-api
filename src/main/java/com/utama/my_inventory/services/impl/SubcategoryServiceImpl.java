@@ -1,7 +1,6 @@
 package com.utama.my_inventory.services.impl;
 
 import com.utama.my_inventory.dtos.request.SubcategoryRequestDTO;
-import com.utama.my_inventory.dtos.response.CategoryResponseDTO;
 import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
 import com.utama.my_inventory.entities.Category;
 import com.utama.my_inventory.entities.Subcategory;

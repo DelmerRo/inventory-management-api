@@ -174,14 +174,6 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponseDTO> getProductsByCategory(Long categoryId) {
-        log.info("Retrieving products by category ID: {}", categoryId);
-        List<Product> products = productRepository.findBySubcategoryCategoryIdAndActiveTrue(categoryId);
-        return productMapper.toResponseDTOList(products);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public List<ProductResponseDTO> getLowStockProducts(int threshold) {
         log.info("Retrieving low stock products (threshold: {})", threshold);
         List<Product> products = productRepository.findLowStockProducts(threshold);
@@ -238,32 +230,6 @@ public class ProductServiceImpl implements ProductService {
         Product updatedProduct = productRepository.save(product);
 
         log.info("Stock removed from product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
-        return productMapper.toResponseDTO(updatedProduct);
-    }
-
-    @Override
-    @Transactional
-    @CacheEvict(value = {"products", "productSummary"}, key = "#productId")
-    public ProductResponseDTO updateStock(Long productId, int newStock, String reason, String user) {
-        log.info("Updating stock for product ID: {} to {}", productId, newStock);
-
-        Product product = findActiveProductById(productId);
-
-        if (newStock < 0) {
-            throw new BusinessException("Stock cannot be negative");
-        }
-
-        int difference = newStock - product.getCurrentStock();
-
-        if (difference > 0) {
-            product.addStock(difference, reason, user);
-        } else if (difference < 0) {
-            product.removeStock(Math.abs(difference), reason, user);
-        }
-
-        Product updatedProduct = productRepository.save(product);
-
-        log.info("Stock updated for product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
         return productMapper.toResponseDTO(updatedProduct);
     }
 

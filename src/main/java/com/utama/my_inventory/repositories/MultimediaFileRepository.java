@@ -18,14 +18,7 @@ public interface MultimediaFileRepository extends JpaRepository<MultimediaFile, 
     List<MultimediaFile> findByProductIdOrderByUploadedAtDesc(Long productId);
     List<MultimediaFile> findByProductIdAndFileTypeOrderByUploadedAtDesc(Long productId, FileType fileType);
 
-    // Búsquedas por tipo
-    List<MultimediaFile> findByFileTypeOrderByUploadedAtDesc(FileType fileType);
-
-    // Búsqueda por URL
-    Optional<MultimediaFile> findByFileUrl(String fileUrl);
-
     // Verificaciones
-    boolean existsByProductIdAndFileName(Long productId, String fileName);
     boolean existsByProductIdAndFileUrl(Long productId, String fileUrl);
 
     // Consultas personalizadas
