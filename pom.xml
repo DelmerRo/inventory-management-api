@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.utama</groupId>
 	<artifactId>my-inventory</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0-SNAPSHOT</version>
 	<name>my personal inventory</name>
 	<description>sistema personal de gestión de inventario y backup de productos</description>
 	<url/>
@@ -108,6 +108,7 @@
 				<configuration>
 					<source>21</source> <!-- Compilar con Java 21 -->
 					<target>21</target> <!-- Generar clases con Java 21 -->
+					<encoding>UTF-8</encoding>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.projectlombok</groupId>
