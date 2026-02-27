@@ -26,8 +26,8 @@ public class SwaggerConfig {
                         .contact(new io.swagger.v3.oas.models.info.Contact()
                                 .name("Utama-Deco"))
                 )
+                .addServersItem(new Server().url("https://inventory-management-api-xbpp.onrender.com").description("Servidor de Producción"))
                 .addServersItem(new Server().url("http://localhost:9092").description("Servidor de Desarrollo"))
-                .addServersItem(new Server().url("https://inventory-management.onrender.com").description("Servidor de Producción"))
                 .addSecurityItem(new SecurityRequirement().addList("TOKEN"))
                 .components(new Components()
                         .addSecuritySchemes("TOKEN",
