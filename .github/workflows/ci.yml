@@ -45,4 +45,5 @@ jobs:
       # Desplegar a Render solo desde main
       - name: Deploy to Render (only main)
         if: github.ref == 'refs/heads/main'
-        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
