@@ -2,7 +2,7 @@ package com.utama.my_inventory.dtos.response.inventory;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.utama.my_inventory.dtos.response.ProductSummaryResponseDTO;
+import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
 import com.utama.my_inventory.entities.enums.MovementType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;

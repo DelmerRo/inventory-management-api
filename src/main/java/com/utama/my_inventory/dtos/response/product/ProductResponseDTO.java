@@ -1,12 +1,15 @@
-package com.utama.my_inventory.dtos.response;
+package com.utama.my_inventory.dtos.response.product;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.utama.my_inventory.dtos.response.SubcategoryResponseDTO;
+import com.utama.my_inventory.dtos.response.SupplierAssociationResponseDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -16,7 +19,7 @@ public record ProductResponseDTO(
         @Schema(description = "ID del producto", example = "1")
         Long id,
 
-        @Schema(description = "Código único del producto", example = "PROD-001")
+        @Schema(description = "Código único del producto", example = "LIV-DOR-00001")
         String sku,
 
         @Schema(description = "Nombre del producto", example = "Laptop HP EliteBook")
@@ -30,9 +33,6 @@ public record ProductResponseDTO(
 
         @Schema(description = "Precio de venta", example = "1500.00")
         BigDecimal salePrice,
-
-        @Schema(description = "Precio de promoción", example = "1400.00")
-        BigDecimal promoPrice,
 
         @Schema(description = "Stock actual", example = "10")
         Integer currentStock,
@@ -50,9 +50,9 @@ public record ProductResponseDTO(
         @Schema(description = "Subcategoría del producto")
         SubcategoryResponseDTO subcategory,
 
-        @JsonProperty("supplier")
-        @Schema(description = "Proveedor del producto")
-        SupplierResponseDTO supplier,
+        @JsonProperty("suppliers")
+        @Schema(description = "Lista de proveedores asociados al producto")
+        List<SupplierAssociationResponseDTO> suppliers,
 
         @Schema(description = "Peso en kg", example = "1.500")
         BigDecimal weight,
@@ -88,7 +88,7 @@ public record ProductResponseDTO(
         Boolean lowStock
 ) {
 
-    public static ProductResponseDTOBuilder builder() {
-        return new ProductResponseDTOBuilder();
-    }
+        public static ProductResponseDTOBuilder builder() {
+                return new ProductResponseDTOBuilder();
+        }
 }

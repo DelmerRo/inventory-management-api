@@ -26,7 +26,7 @@ public interface SupplierMapper {
     // RequestDTO to Entity
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "active", constant = "true")
-    @Mapping(target = "products", ignore = true)
+    @Mapping(target = "productSuppliers", ignore = true)  // ← CAMBIADO: products → productSuppliers
     @Mapping(target = "registeredAt", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
@@ -35,7 +35,7 @@ public interface SupplierMapper {
     // Update Entity from DTO
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "active", ignore = true)
-    @Mapping(target = "products", ignore = true)
+    @Mapping(target = "productSuppliers", ignore = true)  // ← CAMBIADO: products → productSuppliers
     @Mapping(target = "registeredAt", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)

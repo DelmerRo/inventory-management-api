@@ -1,19 +1,12 @@
 package com.utama.my_inventory.dtos.request;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
-
 import java.math.BigDecimal;
+import java.util.List;
 
 @Schema(description = "DTO para crear o actualizar un producto")
 public record ProductRequestDTO(
-
-        @NotBlank(message = "SKU es obligatorio")
-        @Pattern(regexp = "^[A-Z0-9\\-._]{3,50}$",
-                message = "SKU debe contener solo letras mayúsculas, números, guiones, puntos y guiones bajos")
-        @Schema(description = "Código único del producto", example = "PROD-001")
-        String sku,
 
         @NotBlank(message = "Nombre es obligatorio")
         @Size(min = 2, max = 200, message = "Nombre debe tener entre 2 y 200 caracteres")
@@ -34,11 +27,6 @@ public record ProductRequestDTO(
         @Schema(description = "Precio de venta", example = "1500.00")
         BigDecimal salePrice,
 
-        @DecimalMin(value = "0.00", inclusive = true, message = "Precio promoción no puede ser negativo")
-        @Digits(integer = 10, fraction = 2, message = "Precio promoción debe tener máximo 10 enteros y 2 decimales")
-        @Schema(description = "Precio de promoción", example = "1400.00")
-        BigDecimal promoPrice,
-
         @Min(value = 0, message = "Stock no puede ser negativo")
         @Schema(description = "Stock inicial", example = "10")
         Integer currentStock,
@@ -47,9 +35,9 @@ public record ProductRequestDTO(
         @Schema(description = "ID de la subcategoría", example = "1")
         Long subcategoryId,
 
-        @NotNull(message = "Proveedor es obligatorio")
-        @Schema(description = "ID del proveedor", example = "1")
-        Long supplierId,
+        @NotEmpty(message = "Debe tener al menos un proveedor")
+        @Schema(description = "Lista de proveedores asociados al producto")
+        List<SupplierAssociationDTO> suppliers,
 
         @DecimalMin(value = "0.001", message = "Peso debe ser mayor a 0")
         @Digits(integer = 5, fraction = 3, message = "Peso debe tener máximo 5 enteros y 3 decimales")

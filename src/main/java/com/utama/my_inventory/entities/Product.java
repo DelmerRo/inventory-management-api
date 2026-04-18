@@ -37,10 +37,10 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "SKU es obligatorio")
+
     @Pattern(regexp = "^[A-Z0-9\\-._]{3,50}$",
             message = "SKU debe contener solo letras mayúsculas, números, guiones, puntos y guiones bajos")
-    @Column(nullable = false, length = 50, unique = true)
+    @Column(length = 30, unique = true, nullable = true)  // nullable = true permite null temporal
     private String sku;
 
     @NotBlank(message = "Nombre es obligatorio")
@@ -48,7 +48,7 @@ public class Product {
     @Column(nullable = false, length = 200)
     private String name;
 
-    @Size(max = 2000, message = "Descripción no puede exceder 2000 caracteres")
+    @Size(max = 50000, message = "Descripción no puede exceder 50000 caracteres")
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -62,11 +62,6 @@ public class Product {
     @Column(name = "sale_price", precision = 12, scale = 2)
     private BigDecimal salePrice;
 
-    @DecimalMin(value = "0.00", inclusive = true, message = "Precio promoción no puede ser negativo")
-    @Digits(integer = 10, fraction = 2, message = "Precio promoción debe tener máximo 10 enteros y 2 decimales")
-    @Column(name = "promo_price", precision = 12, scale = 2)
-    private BigDecimal promoPrice;
-
     @Min(value = 0, message = "Stock no puede ser negativo")
     @Column(name = "current_stock", nullable = false)
     @Builder.Default
@@ -77,12 +72,6 @@ public class Product {
     @JoinColumn(name = "subcategory_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_product_subcategory"))
     private Subcategory subcategory;
-
-    @NotNull(message = "Proveedor es obligatorio")
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "supplier_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_product_supplier"))
-    private Supplier supplier;
 
     @DecimalMin(value = "0.001", message = "Peso debe ser mayor a 0")
     @Digits(integer = 5, fraction = 3, message = "Peso debe tener máximo 5 enteros y 3 decimales")
@@ -132,6 +121,25 @@ public class Product {
     @Builder.Default
     private List<MultimediaFile> multimediaFiles = new ArrayList<>();
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ProductSupplier> productSuppliers = new ArrayList<>();
+
+    public Supplier getPrimarySupplier() {
+        return productSuppliers.stream()
+                .filter(ProductSupplier::getIsPrimary)
+                .findFirst()
+                .map(ProductSupplier::getSupplier)
+                .orElse(null);
+    }
+
+    public String getPrimarySupplierSku() {
+        return productSuppliers.stream()
+                .filter(ProductSupplier::getIsPrimary)
+                .findFirst()
+                .map(ProductSupplier::getSupplierSku)
+                .orElse(null);
+    }
     // Business methods with modern Java
     public BigDecimal calculateMargin() {
         if (costPrice == null || salePrice == null) {

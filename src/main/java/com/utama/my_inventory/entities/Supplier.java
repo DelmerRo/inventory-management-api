@@ -70,7 +70,7 @@ public class Supplier {
 
     @OneToMany(mappedBy = "supplier", cascade = CascadeType.ALL)
     @Builder.Default
-    private List<Product> products = new ArrayList<>();
+    private List<ProductSupplier> productSuppliers = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -81,8 +81,8 @@ public class Supplier {
     private LocalDateTime updatedAt;
 
     public long countActiveProducts() {
-        return products.stream()
-                .filter(Product::getActive)
+        return productSuppliers.stream()
+                .filter(ps -> ps.getProduct().getActive())
                 .count();
     }
 

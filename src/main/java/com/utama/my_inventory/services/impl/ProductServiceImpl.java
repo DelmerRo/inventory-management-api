@@ -1,15 +1,20 @@
 package com.utama.my_inventory.services.impl;
 
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
-import com.utama.my_inventory.dtos.response.ProductResponseDTO;
-import com.utama.my_inventory.dtos.response.ProductSummaryResponseDTO;
+import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
+import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
+import com.utama.my_inventory.dtos.response.product.ProductResponseDTO;
+import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
+import com.utama.my_inventory.dtos.response.SupplierAssociationResponseDTO;
 import com.utama.my_inventory.entities.Product;
+import com.utama.my_inventory.entities.ProductSupplier;
 import com.utama.my_inventory.entities.Subcategory;
 import com.utama.my_inventory.entities.Supplier;
 import com.utama.my_inventory.exceptions.BusinessException;
 import com.utama.my_inventory.exceptions.ResourceNotFoundException;
 import com.utama.my_inventory.mapper.ProductMapper;
 import com.utama.my_inventory.repositories.ProductRepository;
+import com.utama.my_inventory.repositories.ProductSupplierRepository;
 import com.utama.my_inventory.repositories.SubcategoryRepository;
 import com.utama.my_inventory.repositories.SupplierRepository;
 import com.utama.my_inventory.services.ProductService;
@@ -32,40 +37,64 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper productMapper;
     private final SubcategoryRepository subcategoryRepository;
     private final SupplierRepository supplierRepository;
+    private final ProductSupplierRepository productSupplierRepository;
 
+    // ========== CRUD BÁSICO ==========
 
     @Override
     @Transactional
     @CacheEvict(value = {"products", "productSummary"}, allEntries = true)
     public ProductResponseDTO createProduct(ProductRequestDTO requestDTO) {
-
-        log.info("Creating new product with SKU: {}", requestDTO.sku());
-
-        validateUniqueSku(requestDTO.sku());
         validatePricing(requestDTO.costPrice(), requestDTO.salePrice());
+
+        boolean hasPrimary = requestDTO.suppliers().stream().anyMatch(SupplierAssociationDTO::isPrimary);
+        if (!hasPrimary) {
+            throw new BusinessException("Debe especificar al menos un proveedor como principal");
+        }
 
         Product product = productMapper.toEntity(requestDTO);
 
         Subcategory subcategory = subcategoryRepository.findById(requestDTO.subcategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Subcategory not found with ID: " + requestDTO.subcategoryId()
-                ));
-
-        Supplier supplier = supplierRepository.findById(requestDTO.supplierId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Supplier not found with ID: " + requestDTO.supplierId()
-                ));
+                .orElseThrow(() -> new ResourceNotFoundException("Subcategory not found with ID: " + requestDTO.subcategoryId()));
 
         product.setSubcategory(subcategory);
-        product.setSupplier(supplier);
 
         Product savedProduct = productRepository.save(product);
 
-        log.info("Product created with ID: {} and SKU: {}", savedProduct.getId(), savedProduct.getSku());
+        for (SupplierAssociationDTO supplierDTO : requestDTO.suppliers()) {
+            Supplier supplier = supplierRepository.findById(supplierDTO.supplierId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with ID: " + supplierDTO.supplierId()));
 
-        return productMapper.toResponseDTO(savedProduct);
+            ProductSupplier productSupplier = ProductSupplier.builder()
+                    .product(savedProduct)
+                    .supplier(supplier)
+                    .supplierSku(supplierDTO.supplierSku())
+                    .isPrimary(supplierDTO.isPrimary())
+                    .notes(supplierDTO.notes())
+                    .build();
+
+            savedProduct.getProductSuppliers().add(productSupplier);
+        }
+
+        String sku = generateSku(requestDTO, savedProduct.getId());
+        savedProduct.setSku(sku);
+
+        Product finalProduct = productRepository.save(savedProduct);
+
+        log.info("Product created with ID: {} and SKU: {}", finalProduct.getId(), finalProduct.getSku());
+        return productMapper.toResponseDTO(finalProduct);
     }
 
+    private String generateSku(ProductRequestDTO requestDTO, Long productId) {
+        Subcategory subcategory = subcategoryRepository.findById(requestDTO.subcategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Subcategory not found with ID: " + requestDTO.subcategoryId()));
+
+        String categoryCode = subcategory.getCategory().getName().substring(0, 3).toUpperCase();
+        String subcategoryCode = subcategory.getName().substring(0, 3).toUpperCase();
+        String sequentialNumber = String.format("%05d", productId);
+
+        return String.format("%s-%s-%s", categoryCode, subcategoryCode, sequentialNumber);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -95,28 +124,12 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    @Cacheable(value = "productSummary", key = "'all'")
-    public List<ProductSummaryResponseDTO> getAllProductsSummary() {
-        log.info("Retrieving all products summary");
-        List<Product> products = productRepository.findByActiveTrueOrderByNameAsc();
-        return productMapper.toSummaryDTOList(products);
-    }
-
-    @Override
     @Transactional
     @CacheEvict(value = {"products", "productSummary"}, key = "#id")
     public ProductResponseDTO updateProduct(Long id, ProductRequestDTO requestDTO) {
         log.info("Updating product with ID: {}", id);
 
         Product product = findActiveProductById(id);
-
-        // Validar SKU único si cambió
-        if (!product.getSku().equals(requestDTO.sku())) {
-            validateUniqueSku(requestDTO.sku());
-        }
-
-        // Validar que el precio de venta no sea menor al costo
         validatePricing(requestDTO.costPrice(), requestDTO.salePrice());
 
         productMapper.updateEntityFromDTO(requestDTO, product);
@@ -156,40 +169,52 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toResponseDTO(updatedProduct);
     }
 
+    // ========== VERSIONES RESUMEN ==========
+
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponseDTO> getProductsBySubcategory(Long subcategoryId) {
-        log.info("Retrieving products by subcategory ID: {}", subcategoryId);
+    @Cacheable(value = "productSummary", key = "'all'")
+    public List<ProductSummaryResponseDTO> getAllProductsSummary() {
+        log.info("Retrieving all products summary");
+        List<Product> products = productRepository.findByActiveTrueOrderByNameAsc();
+        return productMapper.toSummaryDTOList(products);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponseDTO> getProductsBySubcategorySummary(Long subcategoryId) {
+        log.info("Retrieving products summary by subcategory ID: {}", subcategoryId);
         List<Product> products = productRepository.findBySubcategoryIdAndActiveTrue(subcategoryId);
-        return productMapper.toResponseDTOList(products);
+        return productMapper.toSummaryDTOList(products);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponseDTO> getProductsBySupplier(Long supplierId) {
-        log.info("Retrieving products by supplier ID: {}", supplierId);
-        List<Product> products = productRepository.findBySupplierIdAndActiveTrue(supplierId);
-        return productMapper.toResponseDTOList(products);
+    public List<ProductSummaryResponseDTO> getProductsBySupplierSummary(Long supplierId) {
+        log.info("Retrieving products summary by supplier ID: {}", supplierId);
+        List<Product> products = productRepository.findProductsBySupplierId(supplierId);
+        return productMapper.toSummaryDTOList(products);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponseDTO> getLowStockProducts(int threshold) {
-        log.info("Retrieving low stock products (threshold: {})", threshold);
+    public List<ProductSummaryResponseDTO> getLowStockProductsSummary(int threshold) {
+        log.info("Retrieving low stock products summary (threshold: {})", threshold);
         List<Product> products = productRepository.findLowStockProducts(threshold);
-        return productMapper.toResponseDTOList(products);
+        return productMapper.toSummaryDTOList(products);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponseDTO> searchProducts(String name, String sku, BigDecimal minPrice,
-                                                   BigDecimal maxPrice, Long subcategoryId, Long supplierId) {
-        log.info("Searching products with filters - name: {}, sku: {}, minPrice: {}, maxPrice: {}, subcategoryId: {}, supplierId: {}",
-                name, sku, minPrice, maxPrice, subcategoryId, supplierId);
-
+    public List<ProductSummaryResponseDTO> searchProductsSummary(String name, String sku,
+                                                                 BigDecimal minPrice, BigDecimal maxPrice,
+                                                                 Long subcategoryId, Long supplierId) {
+        log.info("Searching products summary with filters");
         List<Product> products = productRepository.searchProducts(name, sku, minPrice, maxPrice, subcategoryId, supplierId);
-        return productMapper.toResponseDTOList(products);
+        return productMapper.toSummaryDTOList(products);
     }
+
+    // ========== GESTIÓN DE STOCK ==========
 
     @Override
     @Transactional
@@ -233,6 +258,8 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toResponseDTO(updatedProduct);
     }
 
+    // ========== ESTADÍSTICAS ==========
+
     @Override
     @Transactional(readOnly = true)
     public Long getTotalProductCount() {
@@ -253,13 +280,166 @@ public class ProductServiceImpl implements ProductService {
         return totalValue != null ? totalValue : BigDecimal.ZERO;
     }
 
-    // ========== PRIVATE HELPER METHODS ==========
+    // ========== CONSULTAS (VERSIÓN COMPLETA) ==========
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDTO> getProductsBySubcategory(Long subcategoryId) {
+        log.info("Retrieving products by subcategory ID: {}", subcategoryId);
+        List<Product> products = productRepository.findBySubcategoryIdAndActiveTrue(subcategoryId);
+        return productMapper.toResponseDTOList(products);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDTO> getProductsBySupplier(Long supplierId) {
+        log.info("Retrieving products by supplier ID: {}", supplierId);
+        List<Product> products = productRepository.findProductsBySupplierId(supplierId);
+        return productMapper.toResponseDTOList(products);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDTO> getLowStockProducts(int threshold) {
+        log.info("Retrieving low stock products (threshold: {})", threshold);
+        List<Product> products = productRepository.findLowStockProducts(threshold);
+        return productMapper.toResponseDTOList(products);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDTO> searchProducts(String name, String sku, BigDecimal minPrice,
+                                                   BigDecimal maxPrice, Long subcategoryId, Long supplierId) {
+        log.info("Searching products with filters");
+        List<Product> products = productRepository.searchProducts(name, sku, minPrice, maxPrice, subcategoryId, supplierId);
+        return productMapper.toResponseDTOList(products);
+    }
+
+    // ========== DETALLES ==========
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = "productDetails", key = "#id")
+    public ProductDetailResponseDTO getProductDetailById(Long id) {
+        log.info("Retrieving product detail for ID: {}", id);
+        Product product = findActiveProductById(id);
+        return productMapper.toDetailDTO(product);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductDetailResponseDTO getProductDetailBySku(String sku) {
+        log.info("Retrieving product detail for SKU: {}", sku);
+        Product product = productRepository.findBySkuAndActiveTrue(sku)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with SKU: " + sku));
+        return productMapper.toDetailDTO(product);
+    }
+
+    // ========== MÉTODOS PARA MÚLTIPLES PROVEEDORES ==========
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SupplierAssociationResponseDTO> getProductSuppliers(Long productId) {
+        log.info("Getting suppliers for product ID: {}", productId);
+        findActiveProductById(productId);
+
+        List<ProductSupplier> productSuppliers = productSupplierRepository.findByProductId(productId);
+
+        return productSuppliers.stream()
+                .map(this::mapToSupplierAssociationResponseDTO)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"products", "productSummary"}, key = "#productId")
+    public ProductResponseDTO addSupplierToProduct(Long productId, SupplierAssociationDTO supplierDTO) {
+        log.info("Adding supplier {} to product {}", supplierDTO.supplierId(), productId);
+
+        Product product = findActiveProductById(productId);
+
+        if (productSupplierRepository.findByProductIdAndSupplierId(productId, supplierDTO.supplierId()).isPresent()) {
+            throw new BusinessException("Supplier already associated with this product");
+        }
+
+        Supplier supplier = supplierRepository.findById(supplierDTO.supplierId())
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with ID: " + supplierDTO.supplierId()));
+
+        if (supplierDTO.isPrimary()) {
+            productSupplierRepository.findByProductIdAndIsPrimaryTrue(productId)
+                    .ifPresent(ps -> {
+                        ps.setIsPrimary(false);
+                        productSupplierRepository.save(ps);
+                    });
+        }
+
+        ProductSupplier productSupplier = ProductSupplier.builder()
+                .product(product)
+                .supplier(supplier)
+                .supplierSku(supplierDTO.supplierSku())
+                .isPrimary(supplierDTO.isPrimary())
+                .notes(supplierDTO.notes())
+                .build();
+
+        product.getProductSuppliers().add(productSupplier);
+        Product updatedProduct = productRepository.save(product);
+
+        log.info("Supplier added successfully to product {}", productId);
+        return productMapper.toResponseDTO(updatedProduct);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"products", "productSummary"}, key = "#productId")
+    public void removeSupplierFromProduct(Long productId, Long supplierId) {
+        log.info("Removing supplier {} from product {}", supplierId, productId);
+
+        Product product = findActiveProductById(productId);
+
+        ProductSupplier productSupplier = productSupplierRepository
+                .findByProductIdAndSupplierId(productId, supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not associated with this product"));
+
+        if (productSupplier.getIsPrimary() && product.getProductSuppliers().size() <= 1) {
+            throw new BusinessException("Cannot remove the only supplier. Product must have at least one supplier");
+        }
+
+        product.getProductSuppliers().remove(productSupplier);
+        productSupplierRepository.delete(productSupplier);
+
+        if (productSupplier.getIsPrimary() && !product.getProductSuppliers().isEmpty()) {
+            ProductSupplier newPrimary = product.getProductSuppliers().get(0);
+            newPrimary.setIsPrimary(true);
+            productSupplierRepository.save(newPrimary);
+        }
+
+        productRepository.save(product);
+        log.info("Supplier removed successfully from product {}", productId);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"products", "productSummary"}, key = "#productId")
+    public ProductResponseDTO updateSupplierSku(Long productId, Long supplierId, String supplierSku) {
+        log.info("Updating supplier SKU for product {} and supplier {}", productId, supplierId);
+
+        ProductSupplier productSupplier = productSupplierRepository
+                .findByProductIdAndSupplierId(productId, supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not associated with this product"));
+
+        productSupplier.setSupplierSku(supplierSku);
+        productSupplierRepository.save(productSupplier);
+
+        Product product = findActiveProductById(productId);
+        log.info("Supplier SKU updated successfully");
+        return productMapper.toResponseDTO(product);
+    }
+
+    // ========== MÉTODOS PRIVADOS ==========
 
     private Product findActiveProductById(Long id) {
         return productRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Product not found or inactive with ID: " + id
-                ));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found or inactive with ID: " + id));
     }
 
     private void validateUniqueSku(String sku) {
@@ -272,5 +452,16 @@ public class ProductServiceImpl implements ProductService {
         if (costPrice != null && salePrice != null && salePrice.compareTo(costPrice) < 0) {
             throw new BusinessException("Sale price cannot be less than cost price");
         }
+    }
+
+    private SupplierAssociationResponseDTO mapToSupplierAssociationResponseDTO(ProductSupplier ps) {
+        return new SupplierAssociationResponseDTO(
+                ps.getId(),
+                ps.getSupplier().getId(),
+                ps.getSupplier().getName(),
+                ps.getSupplierSku(),
+                ps.getIsPrimary(),
+                ps.getNotes()
+        );
     }
 }

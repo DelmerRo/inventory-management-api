@@ -24,14 +24,9 @@ public class SupplierDataLoader {
         }
 
         List<Supplier> suppliers = Arrays.asList(
-                createSupplier("Textiles del Valle", "María González", "textiles@valle.com", "+54 11 4321 9876", "Av. Libertador 1234, Buenos Aires"),
-                createSupplier("Decoración Premium", "Carlos López", "decor@premium.com", "+54 351 456 7890", "Calle San Martín 567, Córdoba"),
-                createSupplier("Muebles y Más", "Ana Rodríguez", "ventas@mueblesymas.com", "+54 341 654 3210", "Av. Pellegrini 890, Rosario"),
-                createSupplier("Iluminación Moderna", "Pedro Sánchez", "info@iluminacion.com", "+54 261 789 0123", "Ruta 40 km 1200, Mendoza"),
-                createSupplier("Arte y Diseño", "Laura Fernández", "arte@diseno.com", "+54 299 123 4567", "Av. Argentina 456, Neuquén"),
-                createSupplier("Importaciones Elegance", "Roberto Díaz", "import@elegance.com", "+54 11 8765 4321", "Calle Florida 789, CABA"),
-                createSupplier("Textures Home", "Sofía Martínez", "contacto@textures.com", "+54 381 234 5678", "Av. Sarmiento 321, Tucumán"),
-                createSupplier("Natural Elements", "Diego Pérez", "info@natural.com", "+54 280 456 7891", "Ruta Nacional 3, Bahía Blanca")
+                createSupplier("Eleven Regalos", "Contacto Genérico", "contacto@elevenregalos.com", "+54 9 11 6265-6294", "Sarmiento 2224, CABA"),
+                createSupplier("Plasticuer", "Guadalupe", "ventas@plasticuer.com", "+54 11 6856-3545", "Pres. José Evaristo Uriburu 366, C1025 Cdad. Autónoma de Buenos Aires"),
+                createSupplier("Bazar Rivadavia", "Contacto Genérico", "info@bazarrivadavia.com", "+54 11 3333-8888", "Av. Rivadavia 2241, C1034 ACB, Cdad. Autónoma de Buenos Aires")
         );
 
         supplierRepository.saveAll(suppliers);
@@ -45,9 +40,9 @@ public class SupplierDataLoader {
         }
 
         List<Supplier> suppliers = Arrays.asList(
-                createSupplier("Textiles del Valle", "María González", "textiles@valle.com", "+54 11 4321 9876", "Av. Libertador 1234, Buenos Aires"),
-                createSupplier("Decoración Premium", "Carlos López", "decor@premium.com", "+54 351 456 7890", "Calle San Martín 567, Córdoba"),
-                createSupplier("Muebles y Más", "Ana Rodríguez", "ventas@mueblesymas.com", "+54 341 654 3210", "Av. Pellegrini 890, Rosario")
+                createSupplier("Eleven Regalos", "Contacto Genérico", "contacto@elevenregalos.com", "+54 9 11 6265-6294", "Sarmiento 2224, CABA"),
+                createSupplier("Plasticuer", "Guadalupe", "ventas@plasticuer.com", "+54 11 6856-3545", "Pres. José Evaristo Uriburu 366, C1025 Cdad. Autónoma de Buenos Aires"),
+                createSupplier("Bazar Rivadavia", "Contacto Genérico", "info@bazarrivadavia.com", "+54 11 3333-8888", "Av. Rivadavia 2241, C1034 ACB, Cdad. Autónoma de Buenos Aires")
         );
 
         supplierRepository.saveAll(suppliers);
@@ -72,8 +67,6 @@ public class SupplierDataLoader {
         }
         return suppliers.get(random.nextInt(suppliers.size()));
     }
-
-    // Agregar este método a SupplierDataLoader
 
     public List<Supplier> getAllSuppliers() {
         return supplierRepository.findAll();

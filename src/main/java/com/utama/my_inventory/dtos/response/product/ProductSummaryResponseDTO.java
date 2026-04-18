@@ -1,4 +1,4 @@
-package com.utama.my_inventory.dtos.response;
+package com.utama.my_inventory.dtos.response.product;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,7 +14,7 @@ public record ProductSummaryResponseDTO(
         @Schema(description = "ID del producto", example = "1")
         Long id,
 
-        @Schema(description = "SKU del producto", example = "PROD-001")
+        @Schema(description = "SKU del producto", example = "LIV-DOR-00001")
         String sku,
 
         @Schema(description = "Nombre del producto", example = "Laptop HP EliteBook")
@@ -29,8 +29,11 @@ public record ProductSummaryResponseDTO(
         @Schema(description = "Subcategoría", example = "Laptops")
         String subcategoryName,
 
-        @Schema(description = "Proveedor", example = "HP Inc.")
-        String supplierName,
+        @Schema(description = "Proveedor principal", example = "HP Inc.")
+        String primarySupplierName,
+
+        @Schema(description = "Cantidad de proveedores", example = "2")
+        Integer suppliersCount,
 
         @Schema(description = "Indica si hay stock disponible", example = "true")
         Boolean hasStock,
