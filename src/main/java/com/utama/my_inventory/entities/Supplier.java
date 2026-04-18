@@ -43,6 +43,10 @@ public class Supplier {
     @Column(name = "contact_person", length = 150)
     private String contactPerson;
 
+    @OneToMany(mappedBy = "supplier", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<PurchaseOrder> purchaseOrders = new ArrayList<>();
+
     @Email(message = "Email inválido")
     @Size(max = 100, message = "El email no puede exceder 100 caracteres")
     @Column(length = 100)

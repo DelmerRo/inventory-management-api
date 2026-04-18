@@ -57,4 +57,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("SELECT COALESCE(SUM(p.currentStock * p.costPrice), 0) FROM Product p WHERE p.active = true")
     BigDecimal getTotalInventoryValue();
+
+    Optional<Product> findBySku(String sku);
 }

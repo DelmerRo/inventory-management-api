@@ -113,6 +113,10 @@ public class Product {
     @Column(name = "last_purchase_at")
     private LocalDateTime lastPurchaseAt;
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<PurchaseOrderItem> purchaseOrderItems = new ArrayList<>();
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InventoryMovement> inventoryMovements = new ArrayList<>();
