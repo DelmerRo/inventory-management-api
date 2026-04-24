@@ -13,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -25,8 +25,6 @@ public class ProductDataLoader {
     private final ProductSupplierRepository productSupplierRepository;
     private final SubcategoryDataLoader subcategoryDataLoader;
     private final SupplierDataLoader supplierDataLoader;
-    private static final Random random = new Random();
-    private final AtomicInteger skuCounter = new AtomicInteger(1000);
 
     @Transactional
     public void load() {
@@ -38,117 +36,63 @@ public class ProductDataLoader {
         // Asegurar que las dependencias existen
         ensureDependenciesExist();
 
-        List<Product> products = new ArrayList<>();
-        List<ProductSupplier> productSuppliers = new ArrayList<>();
-
-        // Seleccionar solo 10 subcategorías para tener productos variados
-        List<SubcategoryInfo> selectedSubcategories = getSelectedSubcategories();
-
-        int totalProducts = 0;
-        int productsToCreate = Math.min(10, selectedSubcategories.size());
-
-        System.out.println("\n🎯 Creando " + productsToCreate + " productos (máximo 10)...");
+        System.out.println("\n🎯 Creando producto de ejemplo...");
         System.out.println("================================================");
 
-        List<Supplier> allSuppliers = supplierDataLoader.getAllSuppliers();
+        // Definir un solo producto
+        String categoryName = "Living";
+        String subcategoryName = "Alfombras";
+        String productName = "Alfombra Moderna Gris";
 
-        for (int i = 0; i < productsToCreate && totalProducts < 10; i++) {
-            SubcategoryInfo info = selectedSubcategories.get(i);
+        // Obtener subcategoría
+        Subcategory subcategory = subcategoryDataLoader.getSubcategoryByNameAndCategory(subcategoryName, categoryName);
 
-            // Crear producto sin proveedor aún
-            Product product = createSingleProduct(
-                    info.categoryName,
-                    info.subcategoryName,
-                    info.productName,
-                    i + 1
-            );
+        // Obtener proveedor
+        Supplier supplier = supplierDataLoader.getDefaultSupplier();
 
-            products.add(product);
-            totalProducts++;
+        // Crear producto
+        Product product = createSingleProduct(categoryName, subcategoryName, productName);
 
-            System.out.println("✅ [" + totalProducts + "] " + info.subcategoryName + " - " + info.productName);
-        }
+        // Guardar producto
+        Product savedProduct = productRepository.save(product);
+        System.out.println("✅ Producto creado: " + productName);
 
-        // Guardar productos primero (sin proveedores aún)
-        List<Product> savedProducts = productRepository.saveAll(products);
+        // Crear relación producto-proveedor
+        String supplierSku = generateSupplierSku(productName, supplier.getName());
 
-        // Ahora asociar proveedores a cada producto
-        System.out.println("\n🔗 Asociando proveedores a los productos...");
-        System.out.println("================================================");
+        ProductSupplier productSupplier = ProductSupplier.builder()
+                .product(savedProduct)
+                .supplier(supplier)
+                .supplierSku(supplierSku)
+                .isPrimary(true)
+                .notes("Proveedor principal para " + productName)
+                .build();
 
-        int productIndex = 0;
-        for (Product savedProduct : savedProducts) {
-            SubcategoryInfo info = selectedSubcategories.get(productIndex);
-
-            // Seleccionar 1 o 2 proveedores aleatorios
-            int numSuppliers = random.nextInt(2) + 1; // 1 o 2 proveedores
-            List<Supplier> selectedSuppliers = getRandomSuppliers(allSuppliers, numSuppliers);
-
-            boolean isFirst = true;
-            for (Supplier supplier : selectedSuppliers) {
-                String supplierSku = generateSupplierSku(info.productName, supplier.getName());
-
-                ProductSupplier productSupplier = ProductSupplier.builder()
-                        .product(savedProduct)
-                        .supplier(supplier)
-                        .supplierSku(supplierSku)
-                        .isPrimary(isFirst) // El primero es el principal
-                        .notes("Proveedor " + (isFirst ? "principal" : "secundario") + " para " + info.productName)
-                        .build();
-
-                productSuppliers.add(productSupplier);
-
-                System.out.println("   📦 " + info.productName + " → " + supplier.getName() +
-                        " (SKU: " + supplierSku + ", " + (isFirst ? "PRINCIPAL" : "secundario") + ")");
-
-                isFirst = false;
-            }
-            productIndex++;
-        }
-
-        // Guardar todas las relaciones producto-proveedor
-        productSupplierRepository.saveAll(productSuppliers);
+        productSupplierRepository.save(productSupplier);
+        System.out.println("   📦 " + productName + " → " + supplier.getName() +
+                " (SKU: " + supplierSku + ", PRINCIPAL)");
 
         // Resumen final
         System.out.println("\n📊 RESUMEN DE PRODUCTOS:");
         System.out.println("================================");
-        System.out.println("Total productos creados: " + totalProducts);
-        System.out.println("Total relaciones producto-proveedor: " + productSuppliers.size());
-        System.out.println("Proveedores disponibles: " + allSuppliers.size());
+        System.out.println("Total productos creados: 1");
+        System.out.println("Total relaciones producto-proveedor: 1");
+        System.out.println("Proveedor asociado: " + supplier.getName());
         System.out.println("================================");
     }
 
     /**
-     * Define 10 subcategorías con nombres de productos específicos
+     * Crear un solo producto con datos realistas
      */
-    private List<SubcategoryInfo> getSelectedSubcategories() {
-        return Arrays.asList(
-                new SubcategoryInfo("Living", "Alfombras", "Alfombra Moderna Gris"),
-                new SubcategoryInfo("Living", "Almohadones", "Almohadón Terciopelo Azul"),
-                new SubcategoryInfo("Dormitorio", "Ropa de cama", "Juego de Sábanas Algodón"),
-                new SubcategoryInfo("Dormitorio", "Mantas", "Manta de Vellón"),
-                new SubcategoryInfo("Cocina & Mesa", "Mantelería", "Mantel Rectangular Lino"),
-                new SubcategoryInfo("Cocina & Mesa", "Textil de Cocina", "Delantal Chef"),
-                new SubcategoryInfo("Baño", "Toallas", "Toalla Baño Algodón"),
-                new SubcategoryInfo("Baño", "Alfombras de baño", "Alfombra Baño Antideslizante"),
-                new SubcategoryInfo("Decoración", "Velas & Aromas", "Vela de Soja Aromática"),
-                new SubcategoryInfo("Decoración", "Jarrones", "Jarrón de Cerámica Alta")
-        );
-    }
-
-    /**
-     * Crear un solo producto con datos realistas (sin proveedor asignado aún)
-     */
-    private Product createSingleProduct(String categoryName, String subcategoryName, String productName, int index) {
+    private Product createSingleProduct(String categoryName, String subcategoryName, String productName) {
         Subcategory subcategory = subcategoryDataLoader.getSubcategoryByNameAndCategory(subcategoryName, categoryName);
 
-        // Precios realistas para productos de decoración
-        BigDecimal costPrice = generateRealisticCostPrice(productName);
-        BigDecimal salePrice = costPrice.multiply(BigDecimal.valueOf(1.4 + (random.nextDouble() * 0.3)))
-                .setScale(2, RoundingMode.HALF_UP);
+        // Precios realistas
+        BigDecimal costPrice = new BigDecimal("1250.00");
+        BigDecimal salePrice = new BigDecimal("1750.00");
 
-        // Generar SKU temporal (se regenerará con el ID real al guardar)
-        String tempSku = "TEMP_" + System.currentTimeMillis() + "_" + index;
+        // SKU temporal (se regenerará con el ID real al guardar)
+        String tempSku = "TEMP_" + System.currentTimeMillis();
 
         Product product = Product.builder()
                 .sku(tempSku) // SKU temporal
@@ -156,16 +100,12 @@ public class ProductDataLoader {
                 .description(generateDescription(productName, subcategoryName))
                 .costPrice(costPrice)
                 .salePrice(salePrice)
-                .currentStock(random.nextInt(80) + 20) // Stock entre 20 y 100 unidades
+                .currentStock(50)
                 .subcategory(subcategory)
-                .weight(BigDecimal.valueOf(random.nextDouble() * 50 + 0.5) // 0.5 - 50.5 kg
-                        .setScale(2, RoundingMode.HALF_UP))
-                .length(BigDecimal.valueOf(random.nextDouble() * 200 + 10) // 10 - 210 cm
-                        .setScale(1, RoundingMode.HALF_UP))
-                .width(BigDecimal.valueOf(random.nextDouble() * 100 + 10) // 10 - 110 cm
-                        .setScale(1, RoundingMode.HALF_UP))
-                .height(BigDecimal.valueOf(random.nextDouble() * 50 + 1) // 1 - 51 cm
-                        .setScale(1, RoundingMode.HALF_UP))
+                .weight(new BigDecimal("2.50").setScale(2, RoundingMode.HALF_UP))
+                .length(new BigDecimal("160.0").setScale(1, RoundingMode.HALF_UP))
+                .width(new BigDecimal("120.0").setScale(1, RoundingMode.HALF_UP))
+                .height(new BigDecimal("1.5").setScale(1, RoundingMode.HALF_UP))
                 .measureUnit("cm")
                 .active(true)
                 .build();
@@ -183,42 +123,7 @@ public class ProductDataLoader {
         String supplierCode = supplierName.substring(0, Math.min(3, supplierName.length()))
                 .toUpperCase()
                 .replace(" ", "");
-        int randomNum = random.nextInt(1000);
-        return String.format("%s-%s-%03d", supplierCode, productCode, randomNum);
-    }
-
-    /**
-     * Seleccionar proveedores aleatorios sin repetir
-     */
-    private List<Supplier> getRandomSuppliers(List<Supplier> suppliers, int count) {
-        if (suppliers.isEmpty()) return List.of();
-
-        List<Supplier> shuffled = new ArrayList<>(suppliers);
-        Collections.shuffle(shuffled);
-        return shuffled.subList(0, Math.min(count, shuffled.size()));
-    }
-
-    /**
-     * Generar precio de costo realista según el tipo de producto
-     */
-    private BigDecimal generateRealisticCostPrice(String productName) {
-        int basePrice;
-
-        if (productName.contains("Alfombra")) {
-            basePrice = random.nextInt(3000) + 1000; // $1000 - $4000
-        } else if (productName.contains("Juego") || productName.contains("Manta")) {
-            basePrice = random.nextInt(2000) + 500; // $500 - $2500
-        } else if (productName.contains("Toalla") || productName.contains("Delantal")) {
-            basePrice = random.nextInt(1000) + 200; // $200 - $1200
-        } else if (productName.contains("Jarrón") || productName.contains("Vela")) {
-            basePrice = random.nextInt(800) + 150; // $150 - $950
-        } else if (productName.contains("Almohadón")) {
-            basePrice = random.nextInt(1500) + 300; // $300 - $1800
-        } else {
-            basePrice = random.nextInt(1500) + 300; // $300 - $1800
-        }
-
-        return BigDecimal.valueOf(basePrice);
+        return String.format("%s-%s-001", supplierCode, productCode);
     }
 
     /**
@@ -242,21 +147,6 @@ public class ProductDataLoader {
         // Verificar que proveedores existen
         if (supplierDataLoader.getAllSuppliers().isEmpty()) {
             supplierDataLoader.load();
-        }
-    }
-
-    /**
-     * Clase auxiliar para almacenar información de subcategoría
-     */
-    private static class SubcategoryInfo {
-        final String categoryName;
-        final String subcategoryName;
-        final String productName;
-
-        SubcategoryInfo(String categoryName, String subcategoryName, String productName) {
-            this.categoryName = categoryName;
-            this.subcategoryName = subcategoryName;
-            this.productName = productName;
         }
     }
 }

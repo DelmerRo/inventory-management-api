@@ -24,7 +24,7 @@ import java.util.List;
                 @Index(name = "idx_product_active", columnList = "active"),
                 @Index(name = "idx_product_sku", columnList = "sku"),
                 @Index(name = "idx_product_subcategory", columnList = "subcategory_id"),
-                @Index(name = "idx_product_supplier", columnList = "supplier_id"),
+              /*  @Index(name = "idx_product_supplier", columnList = "supplier_id"),*/
                 @Index(name = "idx_product_stock", columnList = "current_stock")
         })
 @Data
@@ -42,6 +42,9 @@ public class Product {
             message = "SKU debe contener solo letras mayúsculas, números, guiones, puntos y guiones bajos")
     @Column(length = 30, unique = true, nullable = true)  // nullable = true permite null temporal
     private String sku;
+
+    @Column(name = "supplier_sku")
+    private String supplierSku;
 
     @NotBlank(message = "Nombre es obligatorio")
     @Size(min = 2, max = 200, message = "Nombre debe tener entre 2 y 200 caracteres")
@@ -67,10 +70,8 @@ public class Product {
     @Builder.Default
     private Integer currentStock = 0;
 
-    @NotNull(message = "Subcategoría es obligatoria")
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "subcategory_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_product_subcategory"))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subcategory_id")
     private Subcategory subcategory;
 
     @DecimalMin(value = "0.001", message = "Peso debe ser mayor a 0")

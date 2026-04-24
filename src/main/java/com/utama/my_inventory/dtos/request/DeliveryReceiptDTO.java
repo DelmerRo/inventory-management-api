@@ -18,13 +18,11 @@ public class DeliveryReceiptDTO {
     @NotNull(message = "ID del pedido es obligatorio")
     private Long purchaseOrderId;
 
-    private String deliveryNumber; // Número de remito
-
     private LocalDateTime deliveryDate;
-
-    @NotEmpty(message = "Debe ingresar al menos un producto recibido")
-    private List<ReceivedItemDTO> receivedItems;
 
     @Size(max = 500)
     private String notes;
+
+    @NotEmpty(message = "Debe ingresar al menos un producto recibido")
+    private List<ReceivedItemDTO> receivedItems;
 }

@@ -1,15 +1,12 @@
-package com.utama.my_inventory.repositories
-        ;
+// PurchaseOrderRepository.java
+package com.utama.my_inventory.repositories;
 
 import com.utama.my_inventory.entities.PurchaseOrder;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,17 +19,22 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
 
     List<PurchaseOrder> findByStatus(String status);
 
-    Page<PurchaseOrder> findByStatus(String status, Pageable pageable);
-
-    @Query("SELECT po FROM PurchaseOrder po WHERE po.status = :status AND po.orderDate BETWEEN :startDate AND :endDate")
-    List<PurchaseOrder> findByStatusAndDateRange(@Param("status") String status,
-                                                 @Param("startDate") LocalDateTime startDate,
-                                                 @Param("endDate") LocalDateTime endDate);
-
-    Page<PurchaseOrder> findBySupplierId(Long supplierId, Pageable pageable);
-
-    @Query("SELECT po FROM PurchaseOrder po WHERE po.status IN ('PENDIENTE', 'PARCIAL')")
-    List<PurchaseOrder> findPendingAndPartialOrders();
+    List<PurchaseOrder> findAllByOrderByOrderDateDesc();
 
     boolean existsByOrderNumber(String orderNumber);
+
+    // ✅ Método para PostgreSQL (usando SPLIT_PART)
+    @Query(value = "SELECT COALESCE(MAX(CAST(SPLIT_PART(order_number, '-', 3) AS INTEGER)), 0) " +
+            "FROM purchase_orders " +
+            "WHERE order_number LIKE CONCAT(:year, '-%')",
+            nativeQuery = true)
+    Long getLastSequenceByYear(@Param("year") String year);
+
+    // ✅ Método alternativo para encontrar el último número de pedido
+    @Query("SELECT p.orderNumber FROM PurchaseOrder p WHERE p.orderNumber LIKE CONCAT(:prefix, '%') ORDER BY p.id DESC")
+    List<String> findLastOrderNumbersByPrefix(@Param("prefix") String prefix, org.springframework.data.domain.Pageable pageable);
+
+    // ✅ Método para contar pedidos por año
+    @Query("SELECT COUNT(p) FROM PurchaseOrder p WHERE p.orderNumber LIKE CONCAT(:year, '-%')")
+    Long countOrdersByYear(@Param("year") String year);
 }

@@ -88,6 +88,7 @@ public interface ProductMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "subcategory", ignore = true)
     @Mapping(target = "productSuppliers", ignore = true)
+    @Mapping(target = "supplierSku", ignore = true)  // ✅ Se asignará manualmente después
     @Mapping(target = "active", constant = "true")
     @Mapping(target = "inventoryMovements", ignore = true)
     @Mapping(target = "multimediaFiles", ignore = true)
@@ -103,6 +104,7 @@ public interface ProductMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "subcategory", ignore = true)
     @Mapping(target = "productSuppliers", ignore = true)
+    @Mapping(target = "supplierSku", ignore = true)
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "inventoryMovements", ignore = true)
     @Mapping(target = "multimediaFiles", ignore = true)

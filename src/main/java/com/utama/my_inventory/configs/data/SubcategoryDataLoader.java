@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -18,161 +18,117 @@ public class SubcategoryDataLoader {
 
     @Transactional
     public void load() {
-        if (subcategoryRepository.count() > 0) {
-            return;
-        }
 
-        // Primero asegurar que las categorías existen
-        if (!categoryRepositoryExists()) {
-            categoryDataLoader.load();
-        }
+        // Asegurar categorías
+        categoryDataLoader.load();
 
-        List<Subcategory> subcategories = new ArrayList<>();
-
-        // 1. Living
+        // Living
         Category living = categoryDataLoader.getCategoryByName("Living");
-        subcategories.add(Subcategory.builder().name("Alfombras").category(living).build());
-        subcategories.add(Subcategory.builder().name("Almohadones").category(living).build());
-        subcategories.add(Subcategory.builder().name("Cortinas").category(living).build());
-        subcategories.add(Subcategory.builder().name("Mantas").category(living).build());
+        saveIfNotExists("Alfombras", living);
+        saveIfNotExists("Almohadones", living);
+        saveIfNotExists("Cortinas", living);
+        saveIfNotExists("Mantas", living);
 
-        // 2. Dormitorio
+        // Dormitorio
         Category dormitorio = categoryDataLoader.getCategoryByName("Dormitorio");
-        subcategories.add(Subcategory.builder().name("Ropa de cama").category(dormitorio).build());
-        subcategories.add(Subcategory.builder().name("Cubrecamas & acolchados").category(dormitorio).build());
-        subcategories.add(Subcategory.builder().name("Mantas").category(dormitorio).build());
-        subcategories.add(Subcategory.builder().name("Pie de cama").category(dormitorio).build());
-        subcategories.add(Subcategory.builder().name("Textiles decorativos").category(dormitorio).build());
+        saveIfNotExists("Ropa de cama", dormitorio);
+        saveIfNotExists("Cubrecamas & acolchados", dormitorio);
+        saveIfNotExists("Mantas", dormitorio);
+        saveIfNotExists("Pie de cama", dormitorio);
+        saveIfNotExists("Textiles decorativos", dormitorio);
+        saveIfNotExists("Organización de Ropa y Calzado", dormitorio);
 
-        // 3. Cocina & Mesa
+        // Cocina
         Category cocina = categoryDataLoader.getCategoryByName("Cocina & Mesa");
-        subcategories.add(Subcategory.builder().name("Mantelería").category(cocina).build());
-        subcategories.add(Subcategory.builder().name("Textil de Cocina").category(cocina).build());
-        subcategories.add(Subcategory.builder().name("Mesa").category(cocina).build());
-        subcategories.add(Subcategory.builder().name("Organización de Cocina").category(cocina).build());
-        subcategories.add(Subcategory.builder().name("Accesorios de mesa").category(cocina).build());
+        saveIfNotExists("Mantelería", cocina);
+        saveIfNotExists("Textil de Cocina", cocina);
+        saveIfNotExists("Mesa", cocina);
+        saveIfNotExists("Organización de Cocina", cocina);
+        saveIfNotExists("Accesorios de mesa", cocina);
+        saveIfNotExists("Vajilla & Servicio de Mesa", cocina);
+        saveIfNotExists("Accesorios de cocina", cocina);
 
-        // 4. Baño
+        // Baño
         Category bano = categoryDataLoader.getCategoryByName("Baño");
-        subcategories.add(Subcategory.builder().name("Toallas").category(bano).build());
-        subcategories.add(Subcategory.builder().name("Alfombras de baño").category(bano).build());
-        subcategories.add(Subcategory.builder().name("Cortinas de baño").category(bano).build());
-        subcategories.add(Subcategory.builder().name("Batas").category(bano).build());
-        subcategories.add(Subcategory.builder().name("Accesorios de baño").category(bano).build());
+        saveIfNotExists("Toallas", bano);
+        saveIfNotExists("Alfombras de baño", bano);
+        saveIfNotExists("Cortinas de baño", bano);
+        saveIfNotExists("Batas", bano);
+        saveIfNotExists("Accesorios de baño", bano);
 
-        // 5. Decoración
+        // Decoración
         Category decoracion = categoryDataLoader.getCategoryByName("Decoración");
-        subcategories.add(Subcategory.builder().name("Velas & Aromas").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Objetos decorativos").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Jarrones").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Cuadros & Láminas").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Decoración de pared").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Bandejas decorativas").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Centros de mesa").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Iluminación").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Espejos").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Relojes").category(decoracion).build());
+        saveIfNotExists("Velas & Aromas", decoracion);
+        saveIfNotExists("Objetos decorativos", decoracion);
+        saveIfNotExists("Jarrones", decoracion);
+        saveIfNotExists("Cuadros & Láminas", decoracion);
+        saveIfNotExists("Decoración de pared", decoracion);
+        saveIfNotExists("Bandejas decorativas", decoracion);
+        saveIfNotExists("Centros de mesa", decoracion);
+        saveIfNotExists("Iluminación", decoracion);
+        saveIfNotExists("Espejos", decoracion);
+        saveIfNotExists("Relojes", decoracion);
 
-        // 6. Personalizados
+        // Personalizados
         Category personalizados = categoryDataLoader.getCategoryByName("Personalizados");
-        subcategories.add(Subcategory.builder().name("Textil personalizado").category(personalizados).build());
-        subcategories.add(Subcategory.builder().name("Regalos personalizados").category(personalizados).build());
-        subcategories.add(Subcategory.builder().name("Pedidos a medida").category(personalizados).build());
-        subcategories.add(Subcategory.builder().name("Bordados").category(personalizados).build());
-        subcategories.add(Subcategory.builder().name("Grabados").category(personalizados).build());
-        subcategories.add(Subcategory.builder().name("Monogramas").category(personalizados).build());
+        saveIfNotExists("Textil personalizado", personalizados);
+        saveIfNotExists("Regalos personalizados", personalizados);
+        saveIfNotExists("Pedidos a medida", personalizados);
+        saveIfNotExists("Bordados", personalizados);
+        saveIfNotExists("Grabados", personalizados);
+        saveIfNotExists("Monogramas", personalizados);
 
-        subcategoryRepository.saveAll(subcategories);
+        // Cuidado del Hogar
+        Category cuidado = categoryDataLoader.getCategoryByName("Cuidado del Hogar");
+        saveIfNotExists("Lavandería", cuidado);
+        saveIfNotExists("Organización", cuidado);
+        saveIfNotExists("Guardado", cuidado);
+        saveIfNotExists("Limpieza", cuidado);
+        saveIfNotExists("Planchado", cuidado);
 
-        // Mostrar resumen
-        System.out.println("✅ Subcategorías creadas: " + subcategories.size());
-        printResumen();
+        System.out.println("✅ Subcategorías sincronizadas");
     }
 
     @Transactional
     public void loadEssential() {
-        if (subcategoryRepository.count() > 0) {
-            return;
-        }
 
-        if (!categoryRepositoryExists()) {
-            categoryDataLoader.loadEssential();
-        }
+        categoryDataLoader.loadEssential();
 
-        List<Subcategory> subcategories = new ArrayList<>();
-
-        // Solo las más esenciales
         Category living = categoryDataLoader.getCategoryByName("Living");
-        subcategories.add(Subcategory.builder().name("Alfombras").category(living).build());
-        subcategories.add(Subcategory.builder().name("Almohadones").category(living).build());
+        saveIfNotExists("Alfombras", living);
+        saveIfNotExists("Almohadones", living);
 
         Category dormitorio = categoryDataLoader.getCategoryByName("Dormitorio");
-        subcategories.add(Subcategory.builder().name("Ropa de cama").category(dormitorio).build());
+        saveIfNotExists("Ropa de cama", dormitorio);
 
         Category decoracion = categoryDataLoader.getCategoryByName("Decoración");
-        subcategories.add(Subcategory.builder().name("Velas & Aromas").category(decoracion).build());
-        subcategories.add(Subcategory.builder().name("Cuadros & Láminas").category(decoracion).build());
+        saveIfNotExists("Velas & Aromas", decoracion);
+        saveIfNotExists("Cuadros & Láminas", decoracion);
 
-        subcategoryRepository.saveAll(subcategories);
-        System.out.println("✅ Subcategorías esenciales creadas: " + subcategories.size());
+        System.out.println("✅ Subcategorías esenciales sincronizadas");
     }
 
-    private boolean categoryRepositoryExists() {
-        try {
-            return categoryDataLoader.getCategoryByName("Living") != null;
-        } catch (Exception e) {
-            return false;
+    private void saveIfNotExists(String name, Category category) {
+        if (!subcategoryRepository.existsByNameAndCategoryName(name, category.getName())) {
+            subcategoryRepository.save(
+                    Subcategory.builder()
+                            .name(name)
+                            .category(category)
+                            .build()
+            );
         }
     }
 
-    private void printResumen() {
-        System.out.println("\n📊 RESUMEN DE SUBCATEGORÍAS:");
-        System.out.println("================================");
-
-        // Group by category
-        Map<String, List<String>> grouped = new LinkedHashMap<>();
-        List<Subcategory> all = subcategoryRepository.findAll();
-
-        for (Subcategory sub : all) {
-            String catName = sub.getCategory().getName();
-            grouped.computeIfAbsent(catName, k -> new ArrayList<>())
-                    .add(sub.getName());
-        }
-
-        for (Map.Entry<String, List<String>> entry : grouped.entrySet()) {
-            System.out.println("🏷️  " + entry.getKey() + ":");
-            for (String subName : entry.getValue()) {
-                System.out.println("    └─ " + subName);
-            }
-            System.out.println();
-        }
-
-        System.out.println("================================");
-    }
-
-    // MÉTODO QUE FALTABA - AÑADIR ESTO
     public Subcategory getSubcategoryByNameAndCategory(String subcategoryName, String categoryName) {
-        return subcategoryRepository.findByNameAndCategoryName(subcategoryName, categoryName)
+        return subcategoryRepository
+                .findByNameAndCategoryName(subcategoryName, categoryName)
                 .orElseThrow(() -> new RuntimeException(
-                        "Subcategoría no encontrada: " + subcategoryName + " en categoría " + categoryName));
+                        "Subcategoría no encontrada: " + subcategoryName +
+                                " en categoría " + categoryName
+                ));
     }
 
-    // MÉTODO QUE FALTABA - AÑADIR ESTO
     public List<Subcategory> getAllSubcategories() {
         return subcategoryRepository.findAll();
-    }
-
-    // MÉTODO QUE FALTABA - AÑADIR ESTO
-    public Map<String, List<String>> getSubcategoriesGroupedByCategory() {
-        Map<String, List<String>> grouped = new LinkedHashMap<>();
-        List<Subcategory> all = subcategoryRepository.findAll();
-
-        for (Subcategory sub : all) {
-            String catName = sub.getCategory().getName();
-            grouped.computeIfAbsent(catName, k -> new ArrayList<>())
-                    .add(sub.getName());
-        }
-
-        return grouped;
     }
 }

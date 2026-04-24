@@ -13,15 +13,15 @@ import java.util.List;
 @Repository
 public interface PurchaseOrderItemRepository extends JpaRepository<PurchaseOrderItem, Long> {
 
+    // Buscar items por ID de pedido
     List<PurchaseOrderItem> findByPurchaseOrderId(Long purchaseOrderId);
 
-    // ✅ CORRECTO: Usar LessThan
-    List<PurchaseOrderItem> findByPurchaseOrderIdAndQuantityReceivedLessThan(Long purchaseOrderId, Integer quantity);
-
-    // Alternativa: Buscar items pendientes (cantidad recibida < cantidad pedida)
-    @Query("SELECT poi FROM PurchaseOrderItem poi WHERE poi.purchaseOrder.id = :orderId AND poi.quantityReceived < poi.quantity")
+    // Buscar items pendientes (cantidad recibida < cantidad pedida)
+    @Query("SELECT poi FROM PurchaseOrderItem poi " +
+            "WHERE poi.purchaseOrder.id = :orderId AND poi.quantityReceived < poi.quantity")
     List<PurchaseOrderItem> findPendingItemsByOrderId(@Param("orderId") Long orderId);
 
+    // Actualizar cantidad recibida
     @Modifying
     @Transactional
     @Query("UPDATE PurchaseOrderItem poi SET poi.quantityReceived = :received WHERE poi.id = :itemId")

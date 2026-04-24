@@ -2,6 +2,7 @@ package com.utama.my_inventory.controllers;
 
 import com.utama.my_inventory.dtos.ExtendedBaseResponse;
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
+import com.utama.my_inventory.dtos.request.QuickProductRequestDTO;
 import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
@@ -19,7 +20,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -386,4 +386,33 @@ public class ProductController {
         return ExtendedBaseResponse.ok(images, "Imágenes obtenidas correctamente")
                 .toResponseEntity();
     }
+
+    @Operation(
+            summary = "Crear producto rápido desde pedido de compra",
+            description = "Crea un producto con datos mínimos (nombre, SKU proveedor, subcategoría)"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "✅ Producto creado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "❌ Datos inválidos"),
+            @ApiResponse(responseCode = "409", description = "❌ SKU de proveedor ya existe")
+    })
+    @PostMapping("/quick")
+    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> createQuickProduct(
+            @Valid @RequestBody QuickProductRequestDTO requestDTO) {
+
+        ProductResponseDTO product = productService.createQuickProduct(requestDTO);
+        return ExtendedBaseResponse.created(product, "Producto creado exitosamente")
+                .toResponseEntity();
+    }
+
+    @Operation(summary = "Obtener producto por SKU de proveedor")
+    @GetMapping("/by-supplier-sku/{supplierSku}")
+    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> getProductBySupplierSku(
+            @PathVariable String supplierSku) {
+        ProductResponseDTO product = productService.getProductBySupplierSku(supplierSku);
+        return ExtendedBaseResponse.ok(product, "Producto encontrado")
+                .toResponseEntity();
+    }
+
+
 }

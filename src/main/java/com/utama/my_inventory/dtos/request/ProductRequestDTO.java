@@ -13,9 +13,13 @@ public record ProductRequestDTO(
         @Schema(description = "Nombre del producto", example = "Laptop HP EliteBook")
         String name,
 
-        @Size(max = 2000, message = "Descripción no puede exceder 2000 caracteres")
+        @Size(max = 50000, message = "Descripción no puede exceder 2000 caracteres")
         @Schema(description = "Descripción detallada", example = "Laptop empresarial con 16GB RAM, 512GB SSD")
         String description,
+
+        @Size(max = 50, message = "SKU de proveedor no puede exceder 50 caracteres")
+        @Schema(description = "SKU del proveedor para este producto", example = "HP-ELITE-001")
+        String supplierSku,
 
         @DecimalMin(value = "0.00", inclusive = true, message = "Precio costo no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "Precio costo debe tener máximo 10 enteros y 2 decimales")

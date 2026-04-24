@@ -1,6 +1,7 @@
 package com.utama.my_inventory.services;
 
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
+import com.utama.my_inventory.dtos.request.QuickProductRequestDTO;
 import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
 import com.utama.my_inventory.dtos.response.SupplierAssociationResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
@@ -66,4 +67,8 @@ public interface ProductService {
 
     // Actualizar SKU de proveedor
     ProductResponseDTO updateSupplierSku(Long productId, Long supplierId, String supplierSku);
+
+    ProductResponseDTO createQuickProduct(QuickProductRequestDTO requestDTO);
+
+    ProductResponseDTO getProductBySupplierSku(String supplierSku);
 }

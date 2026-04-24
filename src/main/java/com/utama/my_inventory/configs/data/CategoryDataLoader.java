@@ -6,9 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
-import java.util.List;
-
 @Component
 @RequiredArgsConstructor
 public class CategoryDataLoader {
@@ -17,37 +14,37 @@ public class CategoryDataLoader {
 
     @Transactional
     public void load() {
-        if (categoryRepository.count() > 0) {
-            return;
-        }
 
-        List<Category> categories = Arrays.asList(
-                Category.builder().name("Living").active(true).build(),
-                Category.builder().name("Dormitorio").active(true).build(),
-                Category.builder().name("Cocina & Mesa").active(true).build(),
-                Category.builder().name("Baño").active(true).build(),
-                Category.builder().name("Decoración").active(true).build(),
-                Category.builder().name("Personalizados").active(true).build()
-        );
+        saveIfNotExists("Living");
+        saveIfNotExists("Dormitorio");
+        saveIfNotExists("Cocina & Mesa");
+        saveIfNotExists("Baño");
+        saveIfNotExists("Decoración");
+        saveIfNotExists("Personalizados");
+        saveIfNotExists("Cuidado del Hogar");
 
-        categoryRepository.saveAll(categories);
-        System.out.println("✅ Categorías creadas: " + categories.size());
+        System.out.println("✅ Categorías sincronizadas");
     }
 
     @Transactional
     public void loadEssential() {
-        if (categoryRepository.count() > 0) {
-            return;
+
+        saveIfNotExists("Living");
+        saveIfNotExists("Dormitorio");
+        saveIfNotExists("Decoración");
+
+        System.out.println("✅ Categorías esenciales sincronizadas");
+    }
+
+    private void saveIfNotExists(String name) {
+        if (!categoryRepository.existsByName(name)) {
+            categoryRepository.save(
+                    Category.builder()
+                            .name(name)
+                            .active(true)
+                            .build()
+            );
         }
-
-        List<Category> categories = Arrays.asList(
-                Category.builder().name("Living").active(true).build(),
-                Category.builder().name("Dormitorio").active(true).build(),
-                Category.builder().name("Decoración").active(true).build()
-        );
-
-        categoryRepository.saveAll(categories);
-        System.out.println("✅ Categorías esenciales creadas: " + categories.size());
     }
 
     public Category getCategoryByName(String name) {

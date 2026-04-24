@@ -13,7 +13,8 @@ import java.math.BigDecimal;
 @Table(name = "purchase_order_items",
         indexes = {
                 @Index(name = "idx_poi_order", columnList = "purchase_order_id"),
-                @Index(name = "idx_poi_product", columnList = "product_id")
+                @Index(name = "idx_poi_product", columnList = "product_id"),
+                @Index(name = "idx_poi_sku", columnList = "sku")
         })
 @Data
 @Builder
@@ -31,11 +32,21 @@ public class PurchaseOrderItem {
             foreignKey = @ForeignKey(name = "fk_poi_order"))
     private PurchaseOrder purchaseOrder;
 
-    @NotNull(message = "Producto es obligatorio")
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "product_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_poi_product"))
+    // Producto puede ser NULL si el producto aún no existe en el sistema
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", foreignKey = @ForeignKey(name = "fk_poi_product"))
     private Product product;
+
+    // SKU es obligatorio y se guarda siempre (incluso si el producto existe)
+    @NotBlank(message = "SKU es obligatorio")
+    @Size(max = 50, message = "SKU no puede exceder 50 caracteres")
+    @Column(name = "sku", nullable = false, length = 50)
+    private String sku;
+
+    // Nombre del producto en el momento del pedido (para referencia histórica)
+    @Size(max = 200, message = "Nombre no puede exceder 200 caracteres")
+    @Column(name = "product_name", length = 200)
+    private String productName;
 
     @Min(value = 1, message = "Cantidad debe ser al menos 1")
     @Max(value = 99999, message = "Cantidad no puede exceder 99999")
@@ -62,27 +73,25 @@ public class PurchaseOrderItem {
     }
 
     public Integer getPendingQuantity() {
-        return quantity - quantityReceived;
+        return quantity - (quantityReceived != null ? quantityReceived : 0);
     }
 
     public boolean isFullyReceived() {
-        return quantityReceived != null && quantityReceived >= quantity;
+        int received = quantityReceived != null ? quantityReceived : 0;
+        return received >= quantity;
     }
 
     public void receiveQuantity(int receivedQty) {
         if (receivedQty <= 0) return;
-        int newReceived = (quantityReceived == null ? 0 : quantityReceived) + receivedQty;
-        this.quantityReceived = Math.min(newReceived, quantity);
+        int currentReceived = quantityReceived != null ? quantityReceived : 0;
+        this.quantityReceived = Math.min(currentReceived + receivedQty, quantity);
     }
 
-    // SKU y nombre del producto (para consultas rápidas, no persistido)
-    @Transient
-    public String getProductSku() {
-        return product != null ? product.getSku() : null;
-    }
-
-    @Transient
-    public String getProductName() {
-        return product != null ? product.getName() : null;
+    // Método para obtener el nombre del producto (prioriza el guardado, luego el de la entidad Product)
+    public String getDisplayProductName() {
+        if (productName != null && !productName.isBlank()) {
+            return productName;
+        }
+        return product != null ? product.getName() : "Producto " + sku;
     }
 }

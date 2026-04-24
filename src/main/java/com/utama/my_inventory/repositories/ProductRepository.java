@@ -1,6 +1,8 @@
 package com.utama.my_inventory.repositories;
 
 import com.utama.my_inventory.entities.Product;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -59,4 +61,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     BigDecimal getTotalInventoryValue();
 
     Optional<Product> findBySku(String sku);
+
+    @Query("SELECT MAX(p.id) FROM Product p")
+    Long getMaxId();
+
+    boolean existsBySupplierSku(String supplierSku);
+
+    Optional<Product> findBySupplierSku(@NotBlank(message = "SKU del proveedor es obligatorio") @Size(max = 50, message = "SKU no puede exceder 50 caracteres") String supplierSku);
 }
