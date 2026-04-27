@@ -15,6 +15,13 @@ public interface ProductSupplierRepository extends JpaRepository<ProductSupplier
     List<ProductSupplier> findBySupplierId(Long supplierId);
     Optional<ProductSupplier> findByProductIdAndSupplierId(Long productId, Long supplierId);
     Optional<ProductSupplier> findByProductIdAndIsPrimaryTrue(Long productId);
+
+    // ✅ MÉTODO NUEVO - Buscar por SKU de proveedor
+    Optional<ProductSupplier> findBySupplierSku(String supplierSku);
+
+    // ✅ MÉTODO NUEVO - Verificar existencia por SKU
+    boolean existsBySupplierSku(String supplierSku);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM ProductSupplier ps WHERE ps.product.id = :productId")

@@ -45,16 +45,26 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // ✅ PERMITIR SWAGGER COMPLETAMENTE (agregar todas las rutas necesarias)
                         .requestMatchers(
+                                // Swagger UI
                                 "/swagger-ui/**",
-                                "/v3/api-docs/**",
                                 "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/swagger-resources",
+                                "/webjars/**",
+
+                                // OpenAPI docs
+                                "/api-docs/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/swagger-config",
+
+                                // Rutas públicas
                                 "/api/auth/login"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                // IMPORTANTE: CorsFilter antes que el JWT filter
-                .addFilterBefore(new CorsFilter(corsConfigurationSource()), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(customTokenAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -92,7 +102,6 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Log para depuración
         System.out.println("Configurando CORS con orígenes permitidos: " + allowedOrigins);
 
         config.setAllowedOrigins(allowedOrigins);

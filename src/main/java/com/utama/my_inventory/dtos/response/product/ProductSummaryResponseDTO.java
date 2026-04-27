@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -23,6 +24,9 @@ public record ProductSummaryResponseDTO(
         @Schema(description = "Precio de venta", example = "1500.00")
         BigDecimal salePrice,
 
+        @Schema(description = "Precio de costo", example = "1200.50")
+        BigDecimal costPrice,
+
         @Schema(description = "Stock actual", example = "10")
         Integer currentStock,
 
@@ -39,5 +43,8 @@ public record ProductSummaryResponseDTO(
         Boolean hasStock,
 
         @Schema(description = "Indica si está activo", example = "true")
-        Boolean active
+        Boolean active,
+
+        @Schema(description = "Fecha de creación", example = "2024-01-15T10:30:00")
+        LocalDateTime createdAt
 ) {}

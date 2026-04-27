@@ -44,7 +44,7 @@ public class Product {
     private String sku;
 
     @Column(name = "supplier_sku")
-    private String supplierSku;
+    private String supplierSku = "---";
 
     @NotBlank(message = "Nombre es obligatorio")
     @Size(min = 2, max = 200, message = "Nombre debe tener entre 2 y 200 caracteres")

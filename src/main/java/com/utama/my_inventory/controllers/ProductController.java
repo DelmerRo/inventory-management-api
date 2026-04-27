@@ -13,6 +13,8 @@ import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
 import com.utama.my_inventory.dtos.response.inventory.InventoryMovementResponseDTO;
 import com.utama.my_inventory.dtos.response.multimedia.MultimediaFileResponseDTO;
 import com.utama.my_inventory.dtos.response.multimedia.MultimediaUploadResponseDTO;
+import com.utama.my_inventory.entities.Product;
+import com.utama.my_inventory.repositories.ProductRepository;
 import com.utama.my_inventory.services.InventoryService;
 import com.utama.my_inventory.services.MultimediaService;
 import com.utama.my_inventory.services.ProductService;
@@ -32,8 +34,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/products")
@@ -45,6 +49,7 @@ public class ProductController {
     private final ProductService productService;
     private final InventoryService inventoryService;
     private final MultimediaService multimediaService;
+    private final ProductRepository productRepository;
 
     // ========== CRUD BÁSICO ==========
 
@@ -220,10 +225,12 @@ public class ProductController {
             @Parameter(description = "Precio mínimo") @RequestParam(required = false) BigDecimal minPrice,
             @Parameter(description = "Precio máximo") @RequestParam(required = false) BigDecimal maxPrice,
             @Parameter(description = "ID de subcategoría") @RequestParam(required = false) Long subcategoryId,
-            @Parameter(description = "ID de proveedor") @RequestParam(required = false) Long supplierId) {
+            @Parameter(description = "ID de proveedor") @RequestParam(required = false) Long supplierId,
+            @Parameter(description = "Fecha desde (YYYY-MM-DD)") @RequestParam(required = false) String dateFrom,
+            @Parameter(description = "Fecha hasta (YYYY-MM-DD)") @RequestParam(required = false) String dateTo) {
 
         List<ProductSummaryResponseDTO> products = productService.searchProductsSummary(
-                name, sku, minPrice, maxPrice, subcategoryId, supplierId);
+                name, sku, minPrice, maxPrice, subcategoryId, supplierId, dateFrom, dateTo);
 
         return ExtendedBaseResponse.ok(products, "Búsqueda completada")
                 .toResponseEntity();
@@ -414,5 +421,27 @@ public class ProductController {
                 .toResponseEntity();
     }
 
+    @GetMapping("/debug/{id}")
+    public ResponseEntity<?> debugProduct(@PathVariable Long id) {
+        Product product = productRepository.findById(id).orElse(null);
+        if (product == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("productId", product.getId());
+        debug.put("productName", product.getName());
+        debug.put("productSuppliers", product.getProductSuppliers().stream()
+                .map(ps -> Map.of(
+                        "id", ps.getId(),
+                        "supplierId", ps.getSupplier().getId(),
+                        "supplierName", ps.getSupplier().getName(),
+                        "supplierSku", ps.getSupplierSku(),
+                        "isPrimary", ps.getIsPrimary()
+                ))
+                .collect(Collectors.toList()));
+
+        return ResponseEntity.ok(debug);
+    }
 
 }

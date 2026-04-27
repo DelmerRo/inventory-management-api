@@ -29,6 +29,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
+    private final ProductSupplierRepository productSupplierRepository;  // ✅ Agregar esto
+    private final SubcategoryRepository subcategoryRepository;
 
     private static final String ORDER_PREFIX = "PO";
     private static final int SEQUENCE_LENGTH = 6;
@@ -115,7 +117,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             throw new IllegalStateException("No se puede modificar un pedido completado");
         }
 
-        // Actualizar campos básicos
         if (dto.getExpectedDeliveryDate() != null) {
             order.setExpectedDeliveryDate(dto.getExpectedDeliveryDate());
         }
@@ -123,25 +124,21 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             order.setNotes(dto.getNotes());
         }
 
-        // ✅ ACTUALIZAR ITEMS: Usar un mapa para manejar actualizaciones
         Map<String, PurchaseOrderItem> existingItemsMap = order.getItems().stream()
                 .collect(Collectors.toMap(PurchaseOrderItem::getSku, item -> item));
 
-        // Procesar items del DTO
         List<PurchaseOrderItem> itemsToKeep = new ArrayList<>();
 
         for (PurchaseOrderItemRequestDTO itemDTO : dto.getItems()) {
             PurchaseOrderItem existingItem = existingItemsMap.get(itemDTO.getSupplierSku());
 
             if (existingItem != null) {
-                // Actualizar item existente
                 existingItem.setQuantity(itemDTO.getQuantity());
                 existingItem.setUnitPrice(itemDTO.getUnitPrice());
                 existingItem.setProductName(itemDTO.getProductName() != null ?
                         itemDTO.getProductName() : existingItem.getProductName());
                 itemsToKeep.add(existingItem);
             } else {
-                // Agregar nuevo item
                 PurchaseOrderItem newItem = PurchaseOrderItem.builder()
                         .purchaseOrder(order)
                         .sku(itemDTO.getSupplierSku())
@@ -152,8 +149,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                         .quantityReceived(0)
                         .build();
 
-                // Buscar producto existente por supplierSku
-                productRepository.findBySupplierSku(itemDTO.getSupplierSku())
+                // ✅ Buscar usando ProductSupplier
+                productSupplierRepository.findBySupplierSku(itemDTO.getSupplierSku())
+                        .map(ProductSupplier::getProduct)
                         .ifPresent(newItem::setProduct);
 
                 order.addItem(newItem);
@@ -161,7 +159,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             }
         }
 
-        // Eliminar items que ya no están en el DTO
         order.getItems().removeIf(item -> !itemsToKeep.contains(item));
 
         PurchaseOrder updatedOrder = purchaseOrderRepository.save(order);
@@ -271,11 +268,10 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             throw new IllegalStateException("El pedido ya está completado");
         }
 
-        // ✅ ACTUALIZAR NOTAS si vienen en el request
+        // Actualizar notas si vienen
         if (receiptDTO.getNotes() != null && !receiptDTO.getNotes().trim().isEmpty()) {
             String currentNotes = order.getNotes();
             String newNote = receiptDTO.getNotes();
-
             if (currentNotes != null && !currentNotes.trim().isEmpty()) {
                 order.setNotes(currentNotes + " | " + newNote);
             } else {
@@ -311,14 +307,20 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             Product product = orderedItem.getProduct();
             boolean isNewProduct = false;
 
-            // ✅ Crear producto si no existe
+            // ✅ Crear producto si no existe (usando el método corregido)
             if (product == null && receivedQty > 0) {
                 String productName = orderedItem.getProductName() != null
                         ? orderedItem.getProductName()
                         : "Producto " + supplierSku;
-                product = createOrGetProductBySupplierSku(supplierSku, productName);
+
+                // ✅ IMPORTANTE: Pasar el supplierId del pedido
+                product = createOrGetProductBySupplierSku(
+                        supplierSku,
+                        productName,
+                        order.getSupplier().getId(),
+                        null  // subcategoryId (opcional, puede ser null)
+                );
                 orderedItem.setProduct(product);
-                isNewProduct = true;
             }
 
             int currentReceived = orderedItem.getQuantityReceived() != null ? orderedItem.getQuantityReceived() : 0;
@@ -335,7 +337,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 }
 
                 if (newTotalReceived >= orderedQty) {
-                    // Entrega completa de este producto
                     matchedItems.add(OrderReconciliationDTO.MatchedItemDTO.builder()
                             .sku(product != null ? product.getSku() : supplierSku)
                             .productName(orderedItem.getProductName())
@@ -347,7 +348,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                     log.info("✅ Producto completado: {} - Total recibido: {}/{}",
                             orderedItem.getProductName(), newTotalReceived, orderedQty);
                 } else {
-                    // Entrega parcial de este producto
                     partialItems.add(OrderReconciliationDTO.PartialItemDTO.builder()
                             .sku(product != null ? product.getSku() : supplierSku)
                             .productName(orderedItem.getProductName())
@@ -373,7 +373,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 }
 
             } else if (receivedQty == 0 && currentReceived == 0) {
-                // Producto no recibido y nunca se había recibido nada
                 missingItems.add(OrderReconciliationDTO.MissingItemDTO.builder()
                         .sku(product != null ? product.getSku() : supplierSku)
                         .productName(orderedItem.getProductName())
@@ -392,15 +391,23 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             ReceivedItemDTO receivedItem = entry.getValue();
 
             if (!orderedItemsMap.containsKey(supplierSku)) {
-                Product product = createOrGetProductBySupplierSku(supplierSku, receivedItem.getProductName());
+                // ✅ Crear producto extra con el supplierId del pedido
+                Product product = createOrGetProductBySupplierSku(
+                        supplierSku,
+                        receivedItem.getProductName(),
+                        order.getSupplier().getId(),
+                        null  // subcategoryId (opcional)
+                );
 
                 // ✅ ACTIVAR PRODUCTO EXTRA
                 if (product != null && !product.getActive() && receivedItem.getAdditionalQuantity() > 0) {
                     product.setActive(true);
                     log.info("✅ Producto extra ACTIVADO al recibir mercadería - SKU: {}, Nombre: {}",
                             product.getSku(), product.getName());
+                    productRepository.save(product);
                 }
 
+                assert product != null;
                 extraItems.add(OrderReconciliationDTO.ExtraItemDTO.builder()
                         .sku(product.getSku())
                         .productName(product.getName())
@@ -574,9 +581,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         if (existingItemOpt.isPresent()) {
             int newQuantity = getNewQuantity(itemDTO, existingItemOpt);
             log.info("Item actualizado - SKU proveedor: {}, Nueva cantidad: {}", itemDTO.getSupplierSku(), newQuantity);
-
         } else {
-            Optional<Product> productOpt = productRepository.findBySupplierSku(itemDTO.getSupplierSku());
+            // ✅ Buscar usando ProductSupplier (única fuente de verdad)
+            Optional<Product> productOpt = productSupplierRepository
+                    .findBySupplierSku(itemDTO.getSupplierSku())
+                    .map(ProductSupplier::getProduct);
 
             PurchaseOrderItem newItem = PurchaseOrderItem.builder()
                     .purchaseOrder(order)
@@ -608,26 +617,138 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         return newQuantity;
     }
 
-    // PurchaseOrderServiceImpl.java
-    private Product createOrGetProductBySupplierSku(String supplierSku, String productName) {
-        return productRepository.findBySupplierSku(supplierSku)
-                .orElseGet(() -> {
-                    String finalName = (productName != null && !productName.isBlank()) ? productName : "Producto " + supplierSku;
-                    String internalSku = generateProductSku();
+    // PurchaseOrderServiceImpl.java - Reemplazar el método completo
 
-                    Product newProduct = Product.builder()
-                            .sku(internalSku)
-                            .supplierSku(supplierSku)
-                            .name(finalName)
-                            .description("Producto creado automáticamente desde pedido de compra. Pendiente de activación.")
-                            .currentStock(0)
-                            .active(false)  // ✅ INACTIVO hasta recibir mercadería
-                            .build();
+    // ========== MÉTODO CORREGIDO - Versión final ==========
+    /**
+     * Crea o recupera un producto por su SKU de proveedor.
+     * ✅ SIEMPRE crea la relación en ProductSupplier
+     * ✅ NO usa el campo supplierSku de Product
+     * ✅ Maneja subcategoría opcional (puede ser null)
+     */
+    private Product createOrGetProductBySupplierSku(String supplierSku, String productName, Long supplierId, Long subcategoryId) {
+        log.info("🔍 Buscando producto por supplierSku: {}", supplierSku);
 
-                    log.info("Creando nuevo producto INACTIVO - SKU interno: {}, SKU proveedor: {}, Nombre: {}",
-                            internalSku, supplierSku, finalName);
-                    return productRepository.save(newProduct);
-                });
+        // ✅ Buscar en ProductSupplier (única fuente de verdad)
+        Optional<ProductSupplier> existingRelation = productSupplierRepository.findBySupplierSku(supplierSku);
+
+        if (existingRelation.isPresent()) {
+            Product existingProduct = existingRelation.get().getProduct();
+            log.info("✅ Producto encontrado por supplierSku: {} - ID: {}, SKU: {}, Activo: {}",
+                    supplierSku, existingProduct.getId(), existingProduct.getSku(), existingProduct.getActive());
+
+            // Verificar si ya tiene este proveedor asociado (si no, agregarlo)
+            boolean alreadyHasThisSupplier = existingProduct.getProductSuppliers().stream()
+                    .anyMatch(ps -> ps.getSupplier().getId().equals(supplierId));
+
+            if (!alreadyHasThisSupplier && supplierId != null) {
+                // El producto existe pero no tiene este proveedor → agregar relación
+                log.info("Producto existe pero no tiene el proveedor {} - Agregando relación", supplierId);
+                addSupplierToExistingProduct(existingProduct, supplierId, supplierSku);
+            }
+
+            return existingProduct;
+        }
+
+        // ❌ NO EXISTE - Crear nuevo producto
+        log.info("📦 Producto no encontrado, creando nuevo con supplierSku: {}", supplierSku);
+
+        String finalName = (productName != null && !productName.isBlank())
+                ? productName : "Producto " + supplierSku;
+        String internalSku = generateProductSku();
+
+        // ✅ Obtener subcategoría si se proporcionó
+        Subcategory subcategory = null;
+        if (subcategoryId != null) {
+            try {
+                subcategory = subcategoryRepository.findById(subcategoryId).orElse(null);
+                if (subcategory != null) {
+                    log.info("Subcategoría asignada: {} (ID: {})", subcategory.getName(), subcategoryId);
+                }
+            } catch (Exception e) {
+                log.warn("No se pudo obtener subcategoría con ID {}: {}", subcategoryId, e.getMessage());
+            }
+        }
+
+        // ✅ Crear producto SIN supplierSku (ese campo no existe o se ignora)
+        Product newProduct = Product.builder()
+                .sku(internalSku)
+                .name(finalName)
+                .description("Producto creado automáticamente desde pedido de compra. Pendiente de activación.")
+                .currentStock(0)
+                .active(false)
+                .subcategory(subcategory)  // Puede ser null
+                .build();
+
+        Product savedProduct = productRepository.save(newProduct);
+        log.info("✅ Producto base creado - ID: {}, SKU: {}, Subcategoría: {}",
+                savedProduct.getId(), savedProduct.getSku(),
+                subcategory != null ? subcategory.getName() : "NULL");
+
+        // ✅ CREAR LA RELACIÓN ProductSupplier (LO MÁS IMPORTANTE)
+        if (supplierId != null) {
+            try {
+                Supplier supplier = supplierRepository.findById(supplierId)
+                        .orElseThrow(() -> new EntityNotFoundException("Proveedor no encontrado con ID: " + supplierId));
+
+                ProductSupplier productSupplier = ProductSupplier.builder()
+                        .product(savedProduct)
+                        .supplier(supplier)
+                        .supplierSku(supplierSku)
+                        .isPrimary(true)  // Primer proveedor = principal
+                        .notes("Proveedor creado automáticamente desde pedido de compra")
+                        .build();
+
+                // ✅ FORZAR EL GUARDADO EN product_suppliers
+                ProductSupplier savedRelation = productSupplierRepository.save(productSupplier);
+                savedProduct.getProductSuppliers().add(savedRelation);
+
+                log.info("✅✅✅ RELACIÓN ProductSupplier GUARDADA EXITOSAMENTE - ID: {}, Producto: {}, Proveedor: {}, SKU: {}",
+                        savedRelation.getId(), savedProduct.getSku(), supplier.getName(), supplierSku);
+            } catch (Exception e) {
+                log.error("❌ ERROR CRÍTICO al crear relación ProductSupplier: {}", e.getMessage(), e);
+                // No lanzamos excepción para no romper el flujo, pero el log es claro
+            }
+        } else {
+            log.error("❌ ERROR CRÍTICO: supplierId es NULL - No se puede crear relación ProductSupplier");
+        }
+
+        return savedProduct;
+    }
+
+    /**
+     * Agrega un proveedor a un producto existente (para casos donde el producto ya existe pero no tiene este proveedor)
+     */
+    private void addSupplierToExistingProduct(Product product, Long supplierId, String supplierSku) {
+        try {
+            Supplier supplier = supplierRepository.findById(supplierId)
+                    .orElseThrow(() -> new EntityNotFoundException("Proveedor no encontrado con ID: " + supplierId));
+
+            // Verificar si ya existe la relación
+            boolean alreadyExists = productSupplierRepository
+                    .findByProductIdAndSupplierId(product.getId(), supplierId)
+                    .isPresent();
+
+            if (alreadyExists) {
+                log.info("La relación Product-Supplier ya existe para producto {} y proveedor {}", product.getId(), supplierId);
+                return;
+            }
+
+            ProductSupplier productSupplier = ProductSupplier.builder()
+                    .product(product)
+                    .supplier(supplier)
+                    .supplierSku(supplierSku)
+                    .isPrimary(false)  // No es el principal porque ya tiene uno
+                    .notes("Proveedor agregado automáticamente desde recepción de pedido")
+                    .build();
+
+            productSupplierRepository.save(productSupplier);
+            product.getProductSuppliers().add(productSupplier);
+            log.info("✅ Proveedor agregado a producto existente - Producto: {}, Proveedor: {}, SKU: {}",
+                    product.getSku(), supplier.getName(), supplierSku);
+        } catch (Exception e) {
+            log.error("❌ Error al agregar proveedor a producto existente: {}", e.getMessage(), e);
+        }
     }
 
     private String generateProductSku() {

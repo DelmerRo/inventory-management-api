@@ -49,6 +49,8 @@ public interface ProductMapper {
     @Mapping(target = "primarySupplierName", expression = "java(product.getPrimarySupplier() != null ? product.getPrimarySupplier().getName() : null)")
     @Mapping(target = "suppliersCount", expression = "java(product.getProductSuppliers() != null ? product.getProductSuppliers().size() : 0)")
     @Mapping(target = "hasStock", expression = "java(product.getCurrentStock() > 0)")
+    @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "costPrice", source = "costPrice")  // ✅ AGREGAR ESTA LÍNEA
     ProductSummaryResponseDTO toSummaryDTO(Product product);
 
     List<ProductSummaryResponseDTO> toSummaryDTOList(List<Product> products);
@@ -88,7 +90,7 @@ public interface ProductMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "subcategory", ignore = true)
     @Mapping(target = "productSuppliers", ignore = true)
-    @Mapping(target = "supplierSku", ignore = true)  // ✅ Se asignará manualmente después
+    @Mapping(target = "supplierSku", ignore = true)
     @Mapping(target = "active", constant = "true")
     @Mapping(target = "inventoryMovements", ignore = true)
     @Mapping(target = "multimediaFiles", ignore = true)
