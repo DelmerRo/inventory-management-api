@@ -20,7 +20,7 @@ public class SubcategoryDataLoader {
     public void load() {
 
         // Asegurar categorías
-        categoryDataLoader.load();
+        categoryDataLoader.loadIfEmpty();
 
         // Living
         Category living = categoryDataLoader.getCategoryByName("Living");

@@ -29,10 +29,9 @@ public class DataLoaderConfig {
                 subcategoryDataLoader.loadIfEmpty();
                 supplierDataLoader.loadIfEmpty();
             } else {
-                System.out.println("🚧 Desarrollo - Cargando datos de prueba...");
-                categoryDataLoader.load();
-                subcategoryDataLoader.load();
-                supplierDataLoader.load();
+                categoryDataLoader.loadIfEmpty();  // ✅ Cambiar load() por loadIfEmpty()
+                subcategoryDataLoader.loadIfEmpty();
+                supplierDataLoader.loadIfEmpty();
                 System.out.println("✅ Carga de datos completada");
             }
         };
