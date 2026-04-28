@@ -131,4 +131,14 @@ public class SubcategoryDataLoader {
     public List<Subcategory> getAllSubcategories() {
         return subcategoryRepository.findAll();
     }
+
+    public void loadIfEmpty() {
+        if (subcategoryRepository.count() == 0) {
+            System.out.println("📂 Cargando subcategorías esenciales...");
+            load();
+        } else {
+            System.out.println("✅ Las subcategorías ya existen, omitiendo carga.");
+        }
+    }
+
 }

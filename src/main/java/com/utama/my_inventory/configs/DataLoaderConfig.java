@@ -17,33 +17,22 @@ public class DataLoaderConfig {
     public CommandLineRunner loadData(
             CategoryDataLoader categoryDataLoader,
             SubcategoryDataLoader subcategoryDataLoader,
-            SupplierDataLoader supplierDataLoader,
-            ProductDataLoader productDataLoader,
-            InventoryMovementDataLoader inventoryMovementDataLoader,
-            MultimediaFileDataLoader multimediaFileDataLoader) {
+            SupplierDataLoader supplierDataLoader) {
 
         return args -> {
             boolean isProduction = isProductionEnvironment();
 
             if (isProduction) {
-                System.out.println("🔄 Cargando datos esenciales para producción...");
-                categoryDataLoader.loadEssential();
-                subcategoryDataLoader.loadEssential();
-                supplierDataLoader.loadEssential();
-                // No cargamos productos ni archivos en producción
+                System.out.println("✅ Modo producción - No se cargan datos automáticos");
+                // Solo cargar si la tabla está vacía
+                categoryDataLoader.loadIfEmpty();
+                subcategoryDataLoader.loadIfEmpty();
+                supplierDataLoader.loadIfEmpty();
             } else {
-                System.out.println("🚧 Cargando datos completos para desarrollo...");
-                System.out.println("=".repeat(50));
-
-                // Orden importante: dependencias primero
+                System.out.println("🚧 Desarrollo - Cargando datos de prueba...");
                 categoryDataLoader.load();
                 subcategoryDataLoader.load();
                 supplierDataLoader.load();
-                productDataLoader.load();
-                inventoryMovementDataLoader.load();
-                multimediaFileDataLoader.load();
-
-                System.out.println("=".repeat(50));
                 System.out.println("✅ Carga de datos completada");
             }
         };

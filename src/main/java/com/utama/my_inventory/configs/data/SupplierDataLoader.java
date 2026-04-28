@@ -161,4 +161,13 @@ public class SupplierDataLoader {
     public long count() {
         return supplierRepository.count();
     }
+
+    public void loadIfEmpty() {
+        if (supplierRepository.count() == 0) {
+            System.out.println("🏭 Cargando proveedores esenciales...");
+            load();
+        } else {
+            System.out.println("✅ Los proveedores ya existen, omitiendo carga.");
+        }
+    }
 }

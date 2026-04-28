@@ -66,7 +66,7 @@ public class SupplierServiceImpl implements SupplierService {
     @Cacheable(value = "suppliers", key = "'all'")
     public List<SupplierResponseDTO> getAllSuppliers() {
         log.info("Retrieving all active suppliers");
-        List<Supplier> suppliers = supplierRepository.findByActiveTrueOrderByNameAsc();
+        List<Supplier> suppliers = supplierRepository.findAll();
         return supplierMapper.toResponseDTOList(suppliers);
     }
 
@@ -107,7 +107,6 @@ public class SupplierServiceImpl implements SupplierService {
 
         Supplier supplier = findActiveSupplierById(id);
 
-        // Validar que no tenga productos activos
         if (supplier.countActiveProducts() > 0) {
             throw new BusinessException(
                     "Cannot delete supplier '%s' because it has %d associated active products"

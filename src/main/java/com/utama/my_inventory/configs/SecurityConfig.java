@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -22,7 +21,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -45,22 +43,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ PERMITIR SWAGGER COMPLETAMENTE (agregar todas las rutas necesarias)
                         .requestMatchers(
-                                // Swagger UI
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/swagger-resources/**",
-                                "/swagger-resources",
-                                "/webjars/**",
-
-                                // OpenAPI docs
                                 "/api-docs/**",
                                 "/v3/api-docs/**",
-                                "/v3/api-docs",
-                                "/v3/api-docs/swagger-config",
-
-                                // Rutas públicas
                                 "/api/auth/login"
                         ).permitAll()
                         .anyRequest().authenticated()
@@ -73,10 +61,6 @@ public class SecurityConfig {
     public UserDetailsService userDetailsService(
             @Value("${spring.security.user.name:admin}") String username,
             @Value("${spring.security.user.password:admin123}") String password) {
-
-        if (username == null || password == null || password.isBlank()) {
-            throw new IllegalStateException("Credenciales de administrador no configuradas");
-        }
 
         UserDetails admin = User.builder()
                 .username(username)
@@ -102,19 +86,16 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        System.out.println("Configurando CORS con orígenes permitidos: " + allowedOrigins);
+        // Agregar la URL de Vercel
+        List<String> origins = Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "https://inventory-management-frontend-ml2j.vercel.app"
+        );
 
-        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "X-Requested-With",
-                "Origin",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
-        ));
+        config.setAllowedHeaders(Arrays.asList("*"));
         config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

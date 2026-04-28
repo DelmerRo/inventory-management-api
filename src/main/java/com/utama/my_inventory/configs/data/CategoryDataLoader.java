@@ -51,4 +51,14 @@ public class CategoryDataLoader {
         return categoryRepository.findByName(name)
                 .orElseThrow(() -> new RuntimeException("Categoría no encontrada: " + name));
     }
+
+    public void loadIfEmpty() {
+        // Solo carga si no hay categorías
+        if (categoryRepository.count() == 0) {
+            System.out.println("📂 Cargando categorías esenciales...");
+            load();
+        } else {
+            System.out.println("✅ Las categorías ya existen, omitiendo carga.");
+        }
+    }
 }
