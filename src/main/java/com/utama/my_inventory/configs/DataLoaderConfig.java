@@ -1,6 +1,5 @@
 package com.utama.my_inventory.configs;
 
-import com.utama.my_inventory.configs.data.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -14,36 +13,9 @@ public class DataLoaderConfig {
     private final Environment environment;
 
     @Bean
-    public CommandLineRunner loadData(
-            CategoryDataLoader categoryDataLoader,
-            SubcategoryDataLoader subcategoryDataLoader,
-            SupplierDataLoader supplierDataLoader) {
-
+    public CommandLineRunner loadData() {
         return args -> {
-            boolean isProduction = isProductionEnvironment();
-
-            if (isProduction) {
-                System.out.println("✅ Modo producción - No se cargan datos automáticos");
-                // Solo cargar si la tabla está vacía
-                categoryDataLoader.loadIfEmpty();
-                subcategoryDataLoader.loadIfEmpty();
-                supplierDataLoader.loadIfEmpty();
-            } else {
-                categoryDataLoader.loadIfEmpty();  // ✅ Cambiar load() por loadIfEmpty()
-                subcategoryDataLoader.loadIfEmpty();
-                supplierDataLoader.loadIfEmpty();
-                System.out.println("✅ Carga de datos completada");
-            }
+            System.out.println("✅ Inicialización completada - Sin precarga de datos");
         };
-    }
-
-    private boolean isProductionEnvironment() {
-        String[] activeProfiles = environment.getActiveProfiles();
-        for (String profile : activeProfiles) {
-            if ("prod".equalsIgnoreCase(profile)) {
-                return true;
-            }
-        }
-        return false;
     }
 }
