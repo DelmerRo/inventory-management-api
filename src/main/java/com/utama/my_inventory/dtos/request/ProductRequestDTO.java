@@ -13,7 +13,7 @@ public record ProductRequestDTO(
         @Schema(description = "Nombre del producto", example = "Laptop HP EliteBook")
         String name,
 
-        @Size(max = 50000, message = "Descripción no puede exceder 2000 caracteres")
+        @Size(max = 50000, message = "Descripción no puede exceder 50000 caracteres")
         @Schema(description = "Descripción detallada", example = "Laptop empresarial con 16GB RAM, 512GB SSD")
         String description,
 
@@ -21,18 +21,19 @@ public record ProductRequestDTO(
         @Schema(description = "SKU del proveedor para este producto", example = "HP-ELITE-001")
         String supplierSku,
 
-        @DecimalMin(value = "0.00", inclusive = true, message = "Precio costo no puede ser negativo")
+        @DecimalMin(value = "0.00", message = "Precio costo no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "Precio costo debe tener máximo 10 enteros y 2 decimales")
         @Schema(description = "Precio de costo", example = "1200.50")
         BigDecimal costPrice,
 
-        @DecimalMin(value = "0.00", inclusive = true, message = "Precio venta no puede ser negativo")
+        @DecimalMin(value = "0.00", message = "Precio venta no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "Precio venta debe tener máximo 10 enteros y 2 decimales")
         @Schema(description = "Precio de venta", example = "1500.00")
         BigDecimal salePrice,
 
+        // ✅ AGREGAR CAMPO currentStock (solo para creación)
         @Min(value = 0, message = "Stock no puede ser negativo")
-        @Schema(description = "Stock inicial", example = "10")
+        @Schema(description = "Stock inicial (solo para creación)", example = "10")
         Integer currentStock,
 
         @NotNull(message = "Subcategoría es obligatoria")

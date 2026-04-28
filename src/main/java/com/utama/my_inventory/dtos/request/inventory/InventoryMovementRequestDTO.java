@@ -3,10 +3,12 @@ package com.utama.my_inventory.dtos.request.inventory;
 import com.utama.my_inventory.entities.enums.MovementType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
+import lombok.Builder;
 
 import java.math.BigDecimal;
 
 @Schema(description = "DTO para registrar movimiento de inventario")
+@Builder
 public record InventoryMovementRequestDTO(
 
         @NotNull(message = "ID del producto es obligatorio")

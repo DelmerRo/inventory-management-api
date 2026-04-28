@@ -8,8 +8,6 @@ import java.util.List;
 public interface CategoryService {
     CategoryResponseDTO createCategory(CategoryRequestDTO requestDTO);
 
-    List<CategoryResponseDTO> getAllCategories();
-
     CategoryResponseDTO getCategoryById(Long id);
 
     CategoryResponseDTO updateCategory(Long id, CategoryRequestDTO requestDTO);
@@ -17,4 +15,6 @@ public interface CategoryService {
     void deleteCategory(Long id);
 
     CategoryResponseDTO toggleCategoryStatus(Long id);
+
+    List<CategoryResponseDTO> getAllCategories();
 }

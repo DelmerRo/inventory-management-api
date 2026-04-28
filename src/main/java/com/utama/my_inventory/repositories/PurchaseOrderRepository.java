@@ -24,11 +24,10 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
     boolean existsByOrderNumber(String orderNumber);
 
     // ✅ Método para PostgreSQL (usando SPLIT_PART)
-    @Query(value = "SELECT COALESCE(MAX(CAST(SPLIT_PART(order_number, '-', 3) AS INTEGER)), 0) " +
-            "FROM purchase_orders " +
-            "WHERE order_number LIKE CONCAT(:year, '-%')",
-            nativeQuery = true)
-    Long getLastSequenceByYear(@Param("year") String year);
+    @Query("SELECT MAX(CAST(SUBSTRING(p.orderNumber, LOCATE('-', p.orderNumber, 4) + 1) AS integer)) " +
+            "FROM PurchaseOrder p " +
+            "WHERE p.orderNumber LIKE CONCAT(:year, '-%')")
+    Long getLastSequenceByYearJPQL(@Param("year") String year);
 
     // ✅ Método alternativo para encontrar el último número de pedido
     @Query("SELECT p.orderNumber FROM PurchaseOrder p WHERE p.orderNumber LIKE CONCAT(:prefix, '%') ORDER BY p.id DESC")

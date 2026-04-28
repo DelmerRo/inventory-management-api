@@ -42,19 +42,10 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "categories", key = "'all'")
-    public List<CategoryResponseDTO> getAllCategories() {
-        log.info("Retrieving all active categories");
-        List<Category> categories = categoryRepository.findByActiveTrue();
-        return categoryMapper.toResponseDTOList(categories);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     @Cacheable(value = "categories", key = "#id")
     public CategoryResponseDTO getCategoryById(Long id) {
         log.info("Retrieving category with ID: {}", id);
-        Category category = findActiveCategoryById(id);
+        Category category = findCategoryById(id);
         return categoryMapper.toResponseDTO(category);
     }
 
@@ -64,7 +55,7 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponseDTO updateCategory(Long id, CategoryRequestDTO requestDTO) {
         log.info("Updating category with ID: {}", id);
 
-        Category category = findActiveCategoryById(id);
+        Category category = findCategoryById(id);
 
         if (!category.getName().equals(requestDTO.name())) {
             validateUniqueCategoryName(requestDTO.name());
@@ -83,7 +74,7 @@ public class CategoryServiceImpl implements CategoryService {
     public void deleteCategory(Long id) {
         log.info("Attempting to delete category with ID: {}", id);
 
-        Category category = findActiveCategoryById(id);
+        Category category = findCategoryById(id);
 
         if (!category.getSubcategories().isEmpty()) {
             throw new BusinessException(
@@ -102,8 +93,7 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponseDTO toggleCategoryStatus(Long id) {
         log.info("Toggling status for category with ID: {}", id);
 
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+        Category category = findCategoryById(id);
 
         category.setActive(!category.getActive());
         Category updatedCategory = categoryRepository.save(category);
@@ -113,12 +103,24 @@ public class CategoryServiceImpl implements CategoryService {
         return categoryMapper.toResponseDTO(updatedCategory);
     }
 
+    // ✅ UN SOLO MÉTODO - Trae TODAS las categorías (activas + inactivas)
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "'all'")
+    public List<CategoryResponseDTO> getAllCategories() {
+        log.info("Retrieving all categories (including inactive)");
+        List<Category> categories = categoryRepository.findAll();
+        log.info("Categories found: {}", categories.size());
+        return categoryMapper.toResponseDTOList(categories);
+    }
+
     // ========== PRIVATE HELPER METHODS ==========
 
-    private Category findActiveCategoryById(Long id) {
-        return categoryRepository.findByIdAndActiveTrue(id)
+    // ✅ Cambiado: buscar categoría sin importar si está activa
+    private Category findCategoryById(Long id) {
+        return categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Category not found or inactive with ID: " + id
+                        "Category not found with ID: " + id
                 ));
     }
 

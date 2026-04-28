@@ -3,6 +3,8 @@ package com.utama.my_inventory.services.impl;
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
 import com.utama.my_inventory.dtos.request.QuickProductRequestDTO;
 import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
+import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
+import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
@@ -15,6 +17,7 @@ import com.utama.my_inventory.repositories.ProductRepository;
 import com.utama.my_inventory.repositories.ProductSupplierRepository;
 import com.utama.my_inventory.repositories.SubcategoryRepository;
 import com.utama.my_inventory.repositories.SupplierRepository;
+import com.utama.my_inventory.services.InventoryService;
 import com.utama.my_inventory.services.ProductService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,7 @@ public class ProductServiceImpl implements ProductService {
     private final SubcategoryRepository subcategoryRepository;
     private final SupplierRepository supplierRepository;
     private final ProductSupplierRepository productSupplierRepository;
+    private final InventoryService inventoryService;
 
     // ========== CRUD BÁSICO ==========
 
@@ -63,11 +67,10 @@ public class ProductServiceImpl implements ProductService {
         product.setSubcategory(subcategory);
         product.setSku(null);
         product.setActive(true);
-        // ✅ NO asignar supplierSku aquí
 
         Product savedProduct = productRepository.save(product);
 
-        // ✅ Crear relaciones ProductSupplier
+        // Crear relaciones ProductSupplier
         for (SupplierAssociationDTO supplierDTO : requestDTO.suppliers()) {
             Supplier supplier = supplierRepository.findById(supplierDTO.supplierId())
                     .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with ID: " + supplierDTO.supplierId()));
@@ -88,6 +91,17 @@ public class ProductServiceImpl implements ProductService {
         String sku = generateSkuFromSubcategory(subcategory, savedProduct.getId());
         savedProduct.setSku(sku);
 
+        // ✅ Si el producto tiene stock inicial, registrar movimiento
+        if (requestDTO.currentStock() != null && requestDTO.currentStock() > 0) {
+            registerInventoryMovement(
+                    savedProduct.getId(),
+                    requestDTO.currentStock(),
+                    requestDTO.costPrice(),
+                    "Stock inicial al crear producto",
+                    "system"
+            );
+        }
+
         Product finalProduct = productRepository.save(savedProduct);
 
         log.info("Product created with ID: {} and SKU: {}", finalProduct.getId(), finalProduct.getSku());
@@ -102,18 +116,15 @@ public class ProductServiceImpl implements ProductService {
         log.info("SKU proveedor: {}, Nombre: {}, subcategoryId: {}",
                 requestDTO.getSupplierSku(), requestDTO.getName(), requestDTO.getSubcategoryId());
 
-        // ✅ Verificar usando ProductSupplier
         if (productSupplierRepository.existsBySupplierSku(requestDTO.getSupplierSku())) {
             throw new BusinessException("Ya existe un producto con el SKU de proveedor: " + requestDTO.getSupplierSku());
         }
 
-        // Obtener la subcategoría
         Subcategory subcategory = subcategoryRepository.findById(requestDTO.getSubcategoryId())
                 .orElseThrow(() -> new EntityNotFoundException("Subcategoría no encontrada con ID: " + requestDTO.getSubcategoryId()));
 
         log.info("Subcategoría encontrada: {} (ID: {})", subcategory.getName(), subcategory.getId());
 
-        // Crear producto (SIN supplierSku)
         Product tempProduct = Product.builder()
                 .name(requestDTO.getName())
                 .description("Producto creado rápidamente desde pedido de compra. Pendiente de activación.")
@@ -125,12 +136,8 @@ public class ProductServiceImpl implements ProductService {
         Product savedProduct = productRepository.save(tempProduct);
         log.info("Producto guardado con ID: {}", savedProduct.getId());
 
-        // Generar SKU
         String sku = generateSkuFromSubcategory(subcategory, savedProduct.getId());
         savedProduct.setSku(sku);
-
-        // ⚠️ NOTA: createQuickProduct no asigna proveedor porque el DTO no tiene supplierId
-        // El proveedor se asignará cuando se reciba el pedido de compra
 
         Product finalProduct = productRepository.save(savedProduct);
 
@@ -145,7 +152,6 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDTO getProductBySupplierSku(String supplierSku) {
         log.info("Buscando producto por SKU de proveedor: {}", supplierSku);
 
-        // ✅ Buscar en ProductSupplier
         ProductSupplier productSupplier = productSupplierRepository
                 .findBySupplierSku(supplierSku)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con SKU de proveedor: " + supplierSku));
@@ -153,7 +159,6 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toResponseDTO(productSupplier.getProduct());
     }
 
-    // Resto de métodos sin cambios...
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "products", key = "#id")
@@ -187,12 +192,13 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDTO updateProduct(Long id, ProductRequestDTO requestDTO) {
         log.info("Updating product with ID: {}", id);
 
-        Product product = findActiveProductById(id);
+        Product product = findProductById(id);
         validatePricing(requestDTO.costPrice(), requestDTO.salePrice());
 
         productMapper.updateEntityFromDTO(requestDTO, product);
 
-        if (requestDTO.subcategoryId() != null && !requestDTO.subcategoryId().equals(product.getSubcategory().getId())) {
+        if (requestDTO.subcategoryId() != null &&
+                (product.getSubcategory() == null || !requestDTO.subcategoryId().equals(product.getSubcategory().getId()))) {
             Subcategory subcategory = subcategoryRepository.findById(requestDTO.subcategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Subcategory not found with ID: " + requestDTO.subcategoryId()));
             product.setSubcategory(subcategory);
@@ -200,7 +206,7 @@ public class ProductServiceImpl implements ProductService {
             product.setSku(newSku);
         }
 
-        // ✅ Actualizar proveedores
+        // Actualizar proveedores
         productSupplierRepository.deleteByProductId(product.getId());
         product.getProductSuppliers().clear();
 
@@ -220,14 +226,10 @@ public class ProductServiceImpl implements ProductService {
             product.getProductSuppliers().add(productSupplier);
         }
 
-        // ✅ NO asignar supplierSku en Product
-
         Product updatedProduct = productRepository.save(product);
         log.info("Product updated with ID: {}", id);
         return productMapper.toResponseDTO(updatedProduct);
     }
-
-    // Resto de métodos (deleteProduct, toggleProductStatus, getters, stock methods) se mantienen igual...
 
     @Override
     @Transactional
@@ -255,17 +257,16 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // ========== VERSIONES RESUMEN ==========
+
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "productSummary", key = "'all-including-inactive'")
     public List<ProductSummaryResponseDTO> getAllProductsSummary() {
         log.info("Retrieving ALL products summary (including inactive) - ordered by createdAt DESC");
-        // ✅ AHORA: Trae TODOS los productos (activos e inactivos)
         List<Product> products = productRepository.findAllOrderByCreatedAtDesc();
         return productMapper.toSummaryDTOList(products);
     }
 
-    // ✅ NUEVO: Método para obtener solo productos activos (si se necesita)
     @Transactional(readOnly = true)
     @Cacheable(value = "productSummary", key = "'active-only'")
     public List<ProductSummaryResponseDTO> getActiveProductsSummary() {
@@ -274,7 +275,6 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toSummaryDTOList(products);
     }
 
-    // ✅ NUEVO: Método para obtener solo productos inactivos
     @Transactional(readOnly = true)
     @Cacheable(value = "productSummary", key = "'inactive-only'")
     public List<ProductSummaryResponseDTO> getInactiveProductsSummary() {
@@ -287,9 +287,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public List<ProductSummaryResponseDTO> getProductsBySubcategorySummary(Long subcategoryId) {
         log.info("Retrieving ALL products summary by subcategory ID: {} (including inactive)", subcategoryId);
-        // ✅ AHORA: Trae TODOS los productos de la subcategoría
         List<Product> products = productRepository.findBySubcategoryId(subcategoryId);
-        // Ordenar por fecha descendente
         products.sort((a, b) -> {
             if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
             if (a.getCreatedAt() == null) return 1;
@@ -303,9 +301,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public List<ProductSummaryResponseDTO> getProductsBySupplierSummary(Long supplierId) {
         log.info("Retrieving ALL products summary by supplier ID: {} (including inactive)", supplierId);
-        // ✅ AHORA: Trae TODOS los productos del proveedor
         List<Product> products = productRepository.findAllProductsBySupplierId(supplierId);
-        // Ordenar por fecha descendente
         products.sort((a, b) -> {
             if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
             if (a.getCreatedAt() == null) return 1;
@@ -319,7 +315,6 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public List<ProductSummaryResponseDTO> getLowStockProductsSummary(int threshold) {
         log.info("Retrieving ALL low stock products summary (threshold: {}) - including inactive", threshold);
-        // ✅ AHORA: Trae TODOS los productos con stock bajo (activos e inactivos)
         List<Product> products = productRepository.findAllLowStockProducts(threshold);
         return productMapper.toSummaryDTOList(products);
     }
@@ -342,26 +337,34 @@ public class ProductServiceImpl implements ProductService {
             endDate = java.time.LocalDateTime.parse(dateTo + "T23:59:59");
         }
 
-        // ✅ AHORA: Busca en TODOS los productos (sin filtro active)
         List<Product> products = productRepository.searchAllProductsWithDates(
                 name, sku, minPrice, maxPrice, subcategoryId, supplierId, startDate, endDate);
 
         return productMapper.toSummaryDTOList(products);
     }
 
+    // ========== GESTIÓN DE STOCK CON REGISTRO DE MOVIMIENTOS ==========
 
-    // ========== GESTIÓN DE STOCK ==========
     @Override
     @Transactional
     @CacheEvict(value = {"products", "productSummary"}, key = "#productId")
     public ProductResponseDTO addStock(Long productId, int quantity, String reason, String user) {
         log.info("Adding {} units to product ID: {}, reason: {}", quantity, productId, reason);
+
         Product product = findActiveProductById(productId);
+
         if (quantity <= 0) {
             throw new BusinessException("Quantity must be greater than 0");
         }
+
+        // ✅ Registrar movimiento de inventario (ENTRADA)
+        BigDecimal unitCost = product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO;
+        registerInventoryMovement(productId, quantity, unitCost, reason, user);
+
+        // Actualizar stock usando el método de la entidad
         product.addStock(quantity, reason, user);
         Product updatedProduct = productRepository.save(product);
+
         log.info("Stock added to product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
         return productMapper.toResponseDTO(updatedProduct);
     }
@@ -371,28 +374,70 @@ public class ProductServiceImpl implements ProductService {
     @CacheEvict(value = {"products", "productSummary"}, key = "#productId")
     public ProductResponseDTO removeStock(Long productId, int quantity, String reason, String user) {
         log.info("Removing {} units from product ID: {}, reason: {}", quantity, productId, reason);
+
         Product product = findActiveProductById(productId);
+
         if (quantity <= 0) {
             throw new BusinessException("Quantity must be greater than 0");
         }
+
         if (product.getCurrentStock() < quantity) {
             throw new BusinessException("Insufficient stock. Available: " + product.getCurrentStock());
         }
+
+        // ✅ Registrar movimiento de inventario (SALIDA)
+        registerInventoryExitMovement(productId, quantity, reason, user);
+
+        // Actualizar stock usando el método de la entidad
         product.removeStock(quantity, reason, user);
         Product updatedProduct = productRepository.save(product);
+
         log.info("Stock removed from product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
         return productMapper.toResponseDTO(updatedProduct);
     }
 
+    // ========== MÉTODOS PRIVADOS DE INVENTARIO ==========
+
+    /**
+     * Registra un movimiento de entrada de stock
+     */
+    private void registerInventoryMovement(Long productId, int quantity, BigDecimal unitCost, String reason, String user) {
+        try {
+            StockEntryRequestDTO stockEntry = new StockEntryRequestDTO(
+                    productId, quantity, reason, unitCost, user);
+            inventoryService.registerEntry(stockEntry, user);
+            log.info("✅ Movimiento de inventario registrado - Producto ID: {}, Cantidad: +{}, Razón: {}",
+                    productId, quantity, reason);
+        } catch (Exception e) {
+            log.error("❌ Error al registrar movimiento de inventario: {}", e.getMessage(), e);
+            throw new BusinessException("No se pudo registrar el movimiento de inventario: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registra un movimiento de salida de stock
+     */
+    private void registerInventoryExitMovement(Long productId, int quantity, String reason, String user) {
+        try {
+            StockExitRequestDTO stockExit = new StockExitRequestDTO(
+                    productId, quantity, reason, user);
+            inventoryService.registerExit(stockExit, user);
+            log.info("✅ Movimiento de salida registrado - Producto ID: {}, Cantidad: -{}, Razón: {}",
+                    productId, quantity, reason);
+        } catch (Exception e) {
+            log.error("❌ Error al registrar movimiento de salida: {}", e.getMessage(), e);
+            throw new BusinessException("No se pudo registrar el movimiento de salida: " + e.getMessage());
+        }
+    }
+
     // ========== ESTADÍSTICAS ==========
+
     @Override
     @Transactional(readOnly = true)
     public Long getTotalProductCount() {
-        // ✅ AHORA: Cuenta TODOS los productos
         return productRepository.countAllProducts();
     }
 
-    // ✅ NUEVO: Método para contar solo inactivos
     @Transactional(readOnly = true)
     public Long getInactiveProductCount() {
         return productRepository.countAllProducts() - productRepository.countActiveProducts();
@@ -418,6 +463,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // ========== CONSULTAS (VERSIÓN COMPLETA) ==========
+
     @Override
     @Transactional(readOnly = true)
     public List<ProductResponseDTO> getProductsBySubcategory(Long subcategoryId) {
@@ -448,11 +494,13 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // ========== DETALLES ==========
+
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "productDetails", key = "#id")
     public ProductDetailResponseDTO getProductDetailById(Long id) {
-        Product product = findActiveProductById(id);
+        log.info("Retrieving product detail for ID: {} (including inactive)", id);
+        Product product = findProductById(id);  // ✅ Cambiar de findActiveProductById a findProductById
         return productMapper.toDetailDTO(product);
     }
 
@@ -465,6 +513,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // ========== MÉTODOS PARA MÚLTIPLES PROVEEDORES ==========
+
     @Override
     @Transactional(readOnly = true)
     public List<SupplierAssociationResponseDTO> getProductSuppliers(Long productId) {
@@ -530,7 +579,7 @@ public class ProductServiceImpl implements ProductService {
         productSupplierRepository.delete(productSupplier);
 
         if (productSupplier.getIsPrimary() && !product.getProductSuppliers().isEmpty()) {
-            ProductSupplier newPrimary = product.getProductSuppliers().get(0);
+            ProductSupplier newPrimary = product.getProductSuppliers().getFirst();
             newPrimary.setIsPrimary(true);
             productSupplierRepository.save(newPrimary);
         }
@@ -556,6 +605,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // ========== MÉTODOS PRIVADOS ==========
+
     private Product findActiveProductById(Long id) {
         return productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found or inactive with ID: " + id));
@@ -612,5 +662,10 @@ public class ProductServiceImpl implements ProductService {
             normalized = normalized + "X".repeat(3 - normalized.length());
         }
         return normalized.substring(0, 3);
+    }
+
+    private Product findProductById(Long id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
     }
 }

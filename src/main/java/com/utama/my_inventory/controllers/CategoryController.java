@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +22,23 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Categorías", description = "API para gestión de categorías de productos")
 public class CategoryController {
 
     private final CategoryService categoryService;
     private final SubcategoryService subcategoryService;
+
+    // ✅ UN SOLO ENDPOINT - Siempre trae TODAS las categorías (activas + inactivas)
+    @GetMapping
+    @Operation(summary = "Listar todas las categorías")
+    public ResponseEntity<ExtendedBaseResponse<List<CategoryResponseDTO>>> getAllCategories() {
+        log.info("GET /api/categories - Obteniendo todas las categorías");
+        List<CategoryResponseDTO> categories = categoryService.getAllCategories();
+        log.info("Categorías encontradas: {}", categories.size());
+        return ExtendedBaseResponse.ok(categories, "Categorías obtenidas correctamente")
+                .toResponseEntity();
+    }
 
     @PostMapping
     @Operation(summary = "Crear nueva categoría")
@@ -39,15 +52,6 @@ public class CategoryController {
 
         CategoryResponseDTO category = categoryService.createCategory(requestDTO);
         return ExtendedBaseResponse.created(category, "Categoría creada exitosamente")
-                .toResponseEntity();
-    }
-
-    @GetMapping
-    @Operation(summary = "Listar todas las categorías")
-    public ResponseEntity<ExtendedBaseResponse<List<CategoryResponseDTO>>> getAllCategories() {
-
-        List<CategoryResponseDTO> categories = categoryService.getAllCategories();
-        return ExtendedBaseResponse.ok(categories, "Categorías obtenidas correctamente")
                 .toResponseEntity();
     }
 
