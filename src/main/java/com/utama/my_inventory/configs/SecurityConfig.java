@@ -59,8 +59,13 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(
-            @Value("${spring.security.user.name:admin}") String username,
-            @Value("${spring.security.user.password:admin123}") String password) {
+            @Value("${spring.security.user.name}") String username,
+            @Value("${spring.security.user.password}") String password) {
+
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            throw new IllegalStateException("Credenciales de administrador no configuradas. "
+                    + "Debe configurar spring.security.user.name y spring.security.user.password");
+        }
 
         UserDetails admin = User.builder()
                 .username(username)
@@ -86,16 +91,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Agregar la URL de Vercel
-        List<String> origins = Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "https://inventory-management-frontend-ml2j.vercel.app"
-        );
-
-        config.setAllowedOrigins(origins);
+        // ✅ Las URLs de CORS vienen de variables de entorno (sin hardcodear)
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(Arrays.asList("*"));
+        config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
