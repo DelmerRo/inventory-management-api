@@ -38,7 +38,7 @@ public interface ProductService {
     List<ProductSummaryResponseDTO> getLowStockProductsSummary(int threshold);
 
     // ✅ BÚSQUEDA CON FILTROS (incluye fechas)
-    List<ProductSummaryResponseDTO> searchProductsSummary(String name, String sku,
+    List<ProductSummaryResponseDTO> searchProductsSummary(String name, String sku, String supplierSku,
                                                           BigDecimal minPrice, BigDecimal maxPrice,
                                                           Long subcategoryId, Long supplierId,
                                                           String dateFrom, String dateTo);
@@ -68,4 +68,6 @@ public interface ProductService {
     // ========== PRODUCTOS RÁPIDOS ==========
     ProductResponseDTO createQuickProduct(QuickProductRequestDTO requestDTO);
     ProductResponseDTO getProductBySupplierSku(String supplierSku);
+
+    List<ProductSummaryResponseDTO> findByProductSupplierSku(String supplierSku);
 }

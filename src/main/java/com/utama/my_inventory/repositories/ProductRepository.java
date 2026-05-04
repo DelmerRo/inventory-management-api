@@ -29,22 +29,27 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // ========== POR RELACIONES ==========
     List<Product> findBySubcategoryIdAndActiveTrue(Long subcategoryId);
-
-    // ✅ NUEVO: Productos por subcategoría (todos, sin filtrar por active)
     List<Product> findBySubcategoryId(Long subcategoryId);
 
     @Query("SELECT DISTINCT p FROM Product p JOIN p.productSuppliers ps WHERE ps.supplier.id = :supplierId AND p.active = true")
     List<Product> findProductsBySupplierId(@Param("supplierId") Long supplierId);
 
-    // ✅ NUEVO: Productos por proveedor (todos, sin filtrar por active)
     @Query("SELECT DISTINCT p FROM Product p JOIN p.productSuppliers ps WHERE ps.supplier.id = :supplierId")
     List<Product> findAllProductsBySupplierId(@Param("supplierId") Long supplierId);
+
+    // ========== BÚSQUEDA POR SUPPLIER SKU ==========
+    // ✅ NUEVO: Buscar productos por SKU del proveedor
+    @Query("SELECT DISTINCT p FROM Product p JOIN p.productSuppliers ps WHERE ps.supplierSku = :supplierSku")
+    List<Product> findByProductSupplierSku(@Param("supplierSku") String supplierSku);
+
+    // ✅ NUEVO: Buscar productos por SKU del proveedor (con coincidencia parcial)
+    @Query("SELECT DISTINCT p FROM Product p JOIN p.productSuppliers ps WHERE LOWER(ps.supplierSku) LIKE LOWER(CONCAT('%', :supplierSku, '%'))")
+    List<Product> findByProductSupplierSkuContaining(@Param("supplierSku") String supplierSku);
 
     // ========== STOCK ==========
     @Query("SELECT p FROM Product p WHERE p.currentStock < :threshold AND p.active = true")
     List<Product> findLowStockProducts(@Param("threshold") int threshold);
 
-    // ✅ NUEVO: Productos con stock bajo (todos, sin filtrar por active)
     @Query("SELECT p FROM Product p WHERE p.currentStock < :threshold ORDER BY p.createdAt DESC")
     List<Product> findAllLowStockProducts(@Param("threshold") int threshold);
 
@@ -53,12 +58,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             "LEFT JOIN p.productSuppliers ps " +
             "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
             "AND (:sku IS NULL OR p.sku LIKE CONCAT('%', :sku, '%')) " +
+            "AND (:supplierSku IS NULL OR LOWER(ps.supplierSku) LIKE LOWER(CONCAT('%', :supplierSku, '%'))) " +
             "AND (:minPrice IS NULL OR p.salePrice >= :minPrice) " +
             "AND (:maxPrice IS NULL OR p.salePrice <= :maxPrice) " +
             "AND (:subcategoryId IS NULL OR p.subcategory.id = :subcategoryId) " +
             "AND (:supplierId IS NULL OR ps.supplier.id = :supplierId)")
     List<Product> searchAllProducts(@Param("name") String name,
                                     @Param("sku") String sku,
+                                    @Param("supplierSku") String supplierSku,
                                     @Param("minPrice") BigDecimal minPrice,
                                     @Param("maxPrice") BigDecimal maxPrice,
                                     @Param("subcategoryId") Long subcategoryId,
@@ -69,6 +76,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             "LEFT JOIN p.productSuppliers ps " +
             "WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
             "AND (:sku IS NULL OR p.sku LIKE CONCAT('%', :sku, '%')) " +
+            "AND (:supplierSku IS NULL OR LOWER(ps.supplierSku) LIKE LOWER(CONCAT('%', :supplierSku, '%'))) " +
             "AND (:minPrice IS NULL OR p.salePrice >= :minPrice) " +
             "AND (:maxPrice IS NULL OR p.salePrice <= :maxPrice) " +
             "AND (:subcategoryId IS NULL OR p.subcategory.id = :subcategoryId) " +
@@ -78,6 +86,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             "ORDER BY p.createdAt DESC")
     List<Product> searchAllProductsWithDates(@Param("name") String name,
                                              @Param("sku") String sku,
+                                             @Param("supplierSku") String supplierSku,
                                              @Param("minPrice") BigDecimal minPrice,
                                              @Param("maxPrice") BigDecimal maxPrice,
                                              @Param("subcategoryId") Long subcategoryId,
@@ -146,7 +155,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT MAX(p.id) FROM Product p")
     Long getMaxId();
 
-    // ⚠️ DEPRECADO - Usar ProductSupplierRepository.findBySupplierSku en su lugar
+    // ⚠️ DEPRECADO - Usar findByProductSupplierSku en su lugar
     @Deprecated
     boolean existsBySupplierSku(String supplierSku);
 

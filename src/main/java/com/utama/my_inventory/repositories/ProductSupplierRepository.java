@@ -26,4 +26,6 @@ public interface ProductSupplierRepository extends JpaRepository<ProductSupplier
     @Transactional
     @Query("DELETE FROM ProductSupplier ps WHERE ps.product.id = :productId")
     void deleteByProductId(@Param("productId") Long productId);
+
+    List<ProductSupplier> findBySupplierSkuContaining(String supplierSku);
 }

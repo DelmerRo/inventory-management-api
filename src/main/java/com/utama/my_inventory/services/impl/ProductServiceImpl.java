@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -157,6 +158,22 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con SKU de proveedor: " + supplierSku));
 
         return productMapper.toResponseDTO(productSupplier.getProduct());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponseDTO> findByProductSupplierSku(String supplierSku) {
+        log.info("Buscando productos por supplierSku en ProductSupplier: {}", supplierSku);
+
+        // ✅ Buscar en ProductSupplier, NO en Product
+        List<ProductSupplier> productSuppliers = productSupplierRepository.findBySupplierSkuContaining(supplierSku);
+
+        List<Product> products = productSuppliers.stream()
+                .map(ProductSupplier::getProduct)
+                .distinct()
+                .toList();
+
+        return productMapper.toSummaryDTOList(products);
     }
 
     @Override
@@ -321,24 +338,24 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProductSummaryResponseDTO> searchProductsSummary(String name, String sku,
+    public List<ProductSummaryResponseDTO> searchProductsSummary(String name, String sku, String supplierSku,
                                                                  BigDecimal minPrice, BigDecimal maxPrice,
                                                                  Long subcategoryId, Long supplierId,
                                                                  String dateFrom, String dateTo) {
-        log.info("Searching ALL products summary with filters (including inactive)");
+        log.info("Searching ALL products summary with filters (including inactive) - supplierSku: {}", supplierSku);
 
-        java.time.LocalDateTime startDate = null;
-        java.time.LocalDateTime endDate = null;
+      LocalDateTime startDate = null;
+        LocalDateTime endDate = null;
 
         if (dateFrom != null && !dateFrom.isEmpty()) {
-            startDate = java.time.LocalDateTime.parse(dateFrom + "T00:00:00");
+            startDate = LocalDateTime.parse(dateFrom + "T00:00:00");
         }
         if (dateTo != null && !dateTo.isEmpty()) {
-            endDate = java.time.LocalDateTime.parse(dateTo + "T23:59:59");
+            endDate = LocalDateTime.parse(dateTo + "T23:59:59");
         }
 
         List<Product> products = productRepository.searchAllProductsWithDates(
-                name, sku, minPrice, maxPrice, subcategoryId, supplierId, startDate, endDate);
+                name, sku, supplierSku, minPrice, maxPrice, subcategoryId, supplierId, startDate, endDate);
 
         return productMapper.toSummaryDTOList(products);
     }

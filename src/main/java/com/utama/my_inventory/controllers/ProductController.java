@@ -222,6 +222,7 @@ public class ProductController {
     public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> searchProducts(
             @Parameter(description = "Nombre del producto") @RequestParam(required = false) String name,
             @Parameter(description = "SKU del producto") @RequestParam(required = false) String sku,
+            @Parameter(description = "SKU del proveedor") @RequestParam(required = false) String supplierSku,
             @Parameter(description = "Precio mínimo") @RequestParam(required = false) BigDecimal minPrice,
             @Parameter(description = "Precio máximo") @RequestParam(required = false) BigDecimal maxPrice,
             @Parameter(description = "ID de subcategoría") @RequestParam(required = false) Long subcategoryId,
@@ -230,9 +231,19 @@ public class ProductController {
             @Parameter(description = "Fecha hasta (YYYY-MM-DD)") @RequestParam(required = false) String dateTo) {
 
         List<ProductSummaryResponseDTO> products = productService.searchProductsSummary(
-                name, sku, minPrice, maxPrice, subcategoryId, supplierId, dateFrom, dateTo);
+                name, sku, supplierSku, minPrice, maxPrice, subcategoryId, supplierId, dateFrom, dateTo);
 
         return ExtendedBaseResponse.ok(products, "Búsqueda completada")
+                .toResponseEntity();
+    }
+
+    @GetMapping("/by-supplier-sku/{supplierSku}")
+    @Operation(summary = "Buscar productos por SKU del proveedor (desde ProductSupplier)")
+    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplierSku(
+            @Parameter(description = "SKU del proveedor") @PathVariable String supplierSku) {
+
+        List<ProductSummaryResponseDTO> products = productService.findByProductSupplierSku(supplierSku);
+        return ExtendedBaseResponse.ok(products, "Productos encontrados por SKU de proveedor")
                 .toResponseEntity();
     }
 
@@ -409,15 +420,6 @@ public class ProductController {
 
         ProductResponseDTO product = productService.createQuickProduct(requestDTO);
         return ExtendedBaseResponse.created(product, "Producto creado exitosamente")
-                .toResponseEntity();
-    }
-
-    @Operation(summary = "Obtener producto por SKU de proveedor")
-    @GetMapping("/by-supplier-sku/{supplierSku}")
-    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> getProductBySupplierSku(
-            @PathVariable String supplierSku) {
-        ProductResponseDTO product = productService.getProductBySupplierSku(supplierSku);
-        return ExtendedBaseResponse.ok(product, "Producto encontrado")
                 .toResponseEntity();
     }
 

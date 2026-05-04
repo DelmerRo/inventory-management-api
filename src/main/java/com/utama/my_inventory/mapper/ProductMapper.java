@@ -47,6 +47,7 @@ public interface ProductMapper {
     // ========== PARA LISTADOS (SUMMARY) ==========
     @Mapping(target = "subcategoryName", source = "subcategory.name")
     @Mapping(target = "primarySupplierName", expression = "java(product.getPrimarySupplier() != null ? product.getPrimarySupplier().getName() : null)")
+    @Mapping(target = "primarySupplierSku", expression = "java(product.getPrimarySupplierSku())")
     @Mapping(target = "suppliersCount", expression = "java(product.getProductSuppliers() != null ? product.getProductSuppliers().size() : 0)")
     @Mapping(target = "hasStock", expression = "java(product.getCurrentStock() > 0)")
     @Mapping(target = "createdAt", source = "createdAt")

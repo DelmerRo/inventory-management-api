@@ -36,6 +36,9 @@ public record ProductSummaryResponseDTO(
         @Schema(description = "Proveedor principal", example = "HP Inc.")
         String primarySupplierName,
 
+        @Schema(description = "SKU del proveedor principal", example = "HP-ELITE-001")
+        String primarySupplierSku,
+
         @Schema(description = "Cantidad de proveedores", example = "2")
         Integer suppliersCount,
 
