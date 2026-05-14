@@ -68,6 +68,8 @@ public class ProductServiceImpl implements ProductService {
         product.setSubcategory(subcategory);
         product.setSku(null);
         product.setActive(true);
+        // ✅ El stock inicial se setea en 0 (el movimiento lo actualizará después)
+        product.setCurrentStock(0);
 
         Product savedProduct = productRepository.save(product);
 
@@ -92,18 +94,23 @@ public class ProductServiceImpl implements ProductService {
         String sku = generateSkuFromSubcategory(subcategory, savedProduct.getId());
         savedProduct.setSku(sku);
 
-        // ✅ Si el producto tiene stock inicial, registrar movimiento
+        // ✅ Guardar producto ANTES de registrar el movimiento
+        Product finalProduct = productRepository.save(savedProduct);
+
+        // ✅ Si el producto tiene stock inicial, registrar movimiento (esto actualizará el stock automáticamente)
         if (requestDTO.currentStock() != null && requestDTO.currentStock() > 0) {
             registerInventoryMovement(
-                    savedProduct.getId(),
+                    finalProduct.getId(),
                     requestDTO.currentStock(),
                     requestDTO.costPrice(),
                     "Stock inicial al crear producto",
                     "system"
             );
+            // ✅ No actualizar stock manualmente aquí porque registerInventoryMovement ya lo hace
         }
 
-        Product finalProduct = productRepository.save(savedProduct);
+        // ✅ Recargar el producto con el stock actualizado
+        finalProduct = productRepository.findById(finalProduct.getId()).orElse(finalProduct);
 
         log.info("Product created with ID: {} and SKU: {}", finalProduct.getId(), finalProduct.getSku());
         return productMapper.toResponseDTO(finalProduct);
@@ -375,12 +382,13 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // ✅ Registrar movimiento de inventario (ENTRADA)
+        // El inventoryService.registerEntry ya actualiza el stock automáticamente
         BigDecimal unitCost = product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO;
         registerInventoryMovement(productId, quantity, unitCost, reason, user);
 
-        // Actualizar stock usando el método de la entidad
-        product.addStock(quantity, reason, user);
-        Product updatedProduct = productRepository.save(product);
+        // ✅ NO actualizar stock manualmente aquí (el inventoryService ya lo hizo)
+        // Recargar el producto para obtener el stock actualizado
+        Product updatedProduct = productRepository.findById(productId).orElse(product);
 
         log.info("Stock added to product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
         return productMapper.toResponseDTO(updatedProduct);
@@ -403,11 +411,12 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // ✅ Registrar movimiento de inventario (SALIDA)
+        // El inventoryService.registerExit ya actualiza el stock automáticamente
         registerInventoryExitMovement(productId, quantity, reason, user);
 
-        // Actualizar stock usando el método de la entidad
-        product.removeStock(quantity, reason, user);
-        Product updatedProduct = productRepository.save(product);
+        // ✅ NO actualizar stock manualmente aquí (el inventoryService ya lo hizo)
+        // Recargar el producto para obtener el stock actualizado
+        Product updatedProduct = productRepository.findById(productId).orElse(product);
 
         log.info("Stock removed from product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
         return productMapper.toResponseDTO(updatedProduct);
@@ -416,15 +425,15 @@ public class ProductServiceImpl implements ProductService {
     // ========== MÉTODOS PRIVADOS DE INVENTARIO ==========
 
     /**
-     * Registra un movimiento de entrada de stock
+     * Registra un movimiento de entrada de stock (SOLO EL MOVIMIENTO, NO actualiza stock)
      */
     private void registerInventoryMovement(Long productId, int quantity, BigDecimal unitCost, String reason, String user) {
         try {
             StockEntryRequestDTO stockEntry = new StockEntryRequestDTO(
                     productId, quantity, reason, unitCost, user);
             inventoryService.registerEntry(stockEntry, user);
-            log.info("✅ Movimiento de inventario registrado - Producto ID: {}, Cantidad: +{}, Razón: {}",
-                    productId, quantity, reason);
+            log.info("✅ Movimiento de inventario registrado - Producto ID: {}, Cantidad: +{}",
+                    productId, quantity);
         } catch (Exception e) {
             log.error("❌ Error al registrar movimiento de inventario: {}", e.getMessage(), e);
             throw new BusinessException("No se pudo registrar el movimiento de inventario: " + e.getMessage());
@@ -432,15 +441,15 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
-     * Registra un movimiento de salida de stock
+     * Registra un movimiento de salida de stock (SOLO EL MOVIMIENTO, NO actualiza stock)
      */
     private void registerInventoryExitMovement(Long productId, int quantity, String reason, String user) {
         try {
             StockExitRequestDTO stockExit = new StockExitRequestDTO(
                     productId, quantity, reason, user);
             inventoryService.registerExit(stockExit, user);
-            log.info("✅ Movimiento de salida registrado - Producto ID: {}, Cantidad: -{}, Razón: {}",
-                    productId, quantity, reason);
+            log.info("✅ Movimiento de salida registrado - Producto ID: {}, Cantidad: -{}",
+                    productId, quantity);
         } catch (Exception e) {
             log.error("❌ Error al registrar movimiento de salida: {}", e.getMessage(), e);
             throw new BusinessException("No se pudo registrar el movimiento de salida: " + e.getMessage());
