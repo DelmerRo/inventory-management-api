@@ -7,6 +7,7 @@ import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
 import com.utama.my_inventory.dtos.response.SupplierAssociationResponseDTO;
+import com.utama.my_inventory.dtos.response.product.PagedProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
@@ -28,6 +29,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +42,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -120,6 +126,67 @@ public class ProductController {
         ProductDetailResponseDTO product = productService.getProductDetailById(id);
         return ExtendedBaseResponse.ok(product, "Producto encontrado")
                 .toResponseEntity();
+    }
+
+    // ProductController.java
+    @GetMapping("/paged")
+    @Operation(summary = "Obtener productos paginados con filtros y estadísticas globales")
+    public ResponseEntity<ExtendedBaseResponse<PagedProductResponseDTO>> getProductsPaged(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String sku,
+            @RequestParam(required = false) String supplierSku,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Long subcategoryId,
+            @RequestParam(required = false) Long categoryId, // <-- Agregado el parámetro aquí
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) Integer minStock,
+            @RequestParam(required = false) Integer maxStock,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(defaultValue = "createdAt") String sortField,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        // Pasamos categoryId en la posición correspondiente
+        PagedProductResponseDTO pagedResponse = productService.getProductsPaged(
+                name, sku, supplierSku, minPrice, maxPrice, subcategoryId, categoryId, supplierId, active, minStock, maxStock, pageable);
+
+        return ExtendedBaseResponse.ok(pagedResponse, "Búsqueda paginada completada con éxito")
+                .toResponseEntity();
+    }
+
+    // ProductController.java - Agregar este nuevo endpoint
+    @GetMapping("/search-general")
+    @Operation(summary = "Buscar productos por término general (nombre o SKU)")
+    public ResponseEntity<ExtendedBaseResponse<Page<ProductSummaryResponseDTO>>> searchProductsGeneral(
+            @Parameter(description = "Término de búsqueda (nombre o SKU)") @RequestParam(required = false) String query,
+            @Parameter(description = "Precio mínimo") @RequestParam(required = false) BigDecimal minPrice,
+            @Parameter(description = "Precio máximo") @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "ID de subcategoría") @RequestParam(required = false) Long subcategoryId,
+            @Parameter(description = "ID de proveedor") @RequestParam(required = false) Long supplierId,
+            @Parameter(description = "Estado del producto") @RequestParam(required = false) Boolean active,
+            @Parameter(description = "Número de página") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Tamaño de página") @RequestParam(defaultValue = "15") int size,
+            @Parameter(description = "Campo de ordenamiento") @RequestParam(defaultValue = "createdAt") String sortField,
+            @Parameter(description = "Dirección de ordenamiento") @RequestParam(defaultValue = "desc") String sortDirection) {
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        Page<ProductSummaryResponseDTO> productPage = productService.searchProductsGeneral(
+                query, minPrice, maxPrice, subcategoryId, supplierId, active, pageable);
+
+        return ExtendedBaseResponse.ok(productPage, "Búsqueda completada")
+                .toResponseEntity();
+    }
+
+    private String validateSortField(String sortField) {
+        Set<String> allowedFields = Set.of("name", "salePrice", "currentStock", "createdAt", "id");
+        return allowedFields.contains(sortField) ? sortField : "createdAt";
     }
 
     @GetMapping("/sku/{sku}")

@@ -4,9 +4,12 @@ import com.utama.my_inventory.dtos.request.ProductRequestDTO;
 import com.utama.my_inventory.dtos.request.QuickProductRequestDTO;
 import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
 import com.utama.my_inventory.dtos.response.SupplierAssociationResponseDTO;
+import com.utama.my_inventory.dtos.response.product.PagedProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -15,12 +18,8 @@ public interface ProductService {
 
     // ========== CRUD BÁSICO ==========
     ProductResponseDTO createProduct(ProductRequestDTO requestDTO);
-
-    // Detalle esencial
     ProductDetailResponseDTO getProductDetailById(Long id);
     ProductDetailResponseDTO getProductDetailBySku(String sku);
-
-    // Versiones completas
     ProductResponseDTO getProductById(Long id);
     ProductResponseDTO getProductBySku(String sku);
     List<ProductResponseDTO> getAllProducts();
@@ -28,16 +27,26 @@ public interface ProductService {
     void deleteProduct(Long id);
     ProductResponseDTO toggleProductStatus(Long id);
 
-    // ========== VERSIONES RESUMEN (para listados) ==========
-    default List<ProductSummaryResponseDTO> getAllProductsSummary() {
-        return null;
-    }
+    // ========== PAGINACIÓN CON FILTROS (VERSIÓN COMPLETA) ==========
+    // Modificar esta firma en ProductService.java
+    // ProductService.java
+    PagedProductResponseDTO getProductsPaged(
+            String name, String sku, String supplierSku,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            Long subcategoryId, Long categoryId, // <-- Añadido aquí
+            Long supplierId, Boolean active, Integer minStock, Integer maxStock,
+            Pageable pageable);
 
+    // ========== BÚSQUEDA GENERAL ==========
+    Page<ProductSummaryResponseDTO> searchProductsGeneral(
+            String query, BigDecimal minPrice, BigDecimal maxPrice,
+            Long subcategoryId, Long supplierId, Boolean active, Pageable pageable);
+
+    // ========== VERSIONES RESUMEN (legacy) ==========
+    List<ProductSummaryResponseDTO> getAllProductsSummary();
     List<ProductSummaryResponseDTO> getProductsBySubcategorySummary(Long subcategoryId);
     List<ProductSummaryResponseDTO> getProductsBySupplierSummary(Long supplierId);
     List<ProductSummaryResponseDTO> getLowStockProductsSummary(int threshold);
-
-    // ✅ BÚSQUEDA CON FILTROS (incluye fechas)
     List<ProductSummaryResponseDTO> searchProductsSummary(String name, String sku, String supplierSku,
                                                           BigDecimal minPrice, BigDecimal maxPrice,
                                                           Long subcategoryId, Long supplierId,
@@ -52,22 +61,19 @@ public interface ProductService {
     Long getTotalStock();
     BigDecimal getTotalInventoryValue();
 
-    // ========== CONSULTAS (versión completa) ==========
+    // ========== CONSULTAS (legacy) ==========
     List<ProductResponseDTO> getProductsBySubcategory(Long subcategoryId);
     List<ProductResponseDTO> getProductsBySupplier(Long supplierId);
     List<ProductResponseDTO> getLowStockProducts(int threshold);
     List<ProductResponseDTO> searchProducts(String name, String sku, BigDecimal minPrice,
                                             BigDecimal maxPrice, Long subcategoryId, Long supplierId);
 
-    // ========== MÉTODOS PARA MÚLTIPLES PROVEEDORES ==========
+    // ========== PROVEEDORES ==========
     List<SupplierAssociationResponseDTO> getProductSuppliers(Long productId);
     ProductResponseDTO addSupplierToProduct(Long productId, SupplierAssociationDTO supplierDTO);
     void removeSupplierFromProduct(Long productId, Long supplierId);
     ProductResponseDTO updateSupplierSku(Long productId, Long supplierId, String supplierSku);
-
-    // ========== PRODUCTOS RÁPIDOS ==========
-    ProductResponseDTO createQuickProduct(QuickProductRequestDTO requestDTO);
     ProductResponseDTO getProductBySupplierSku(String supplierSku);
-
     List<ProductSummaryResponseDTO> findByProductSupplierSku(String supplierSku);
+    ProductResponseDTO createQuickProduct(QuickProductRequestDTO requestDTO);
 }

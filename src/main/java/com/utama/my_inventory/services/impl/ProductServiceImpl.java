@@ -5,6 +5,7 @@ import com.utama.my_inventory.dtos.request.QuickProductRequestDTO;
 import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
+import com.utama.my_inventory.dtos.response.product.PagedProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
@@ -24,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,7 +71,6 @@ public class ProductServiceImpl implements ProductService {
         product.setSubcategory(subcategory);
         product.setSku(null);
         product.setActive(true);
-        // ✅ El stock inicial se setea en 0 (el movimiento lo actualizará después)
         product.setCurrentStock(0);
 
         Product savedProduct = productRepository.save(product);
@@ -94,10 +96,9 @@ public class ProductServiceImpl implements ProductService {
         String sku = generateSkuFromSubcategory(subcategory, savedProduct.getId());
         savedProduct.setSku(sku);
 
-        // ✅ Guardar producto ANTES de registrar el movimiento
         Product finalProduct = productRepository.save(savedProduct);
 
-        // ✅ Si el producto tiene stock inicial, registrar movimiento (esto actualizará el stock automáticamente)
+        // Si el producto tiene stock inicial, registrar movimiento
         if (requestDTO.currentStock() != null && requestDTO.currentStock() > 0) {
             registerInventoryMovement(
                     finalProduct.getId(),
@@ -106,10 +107,8 @@ public class ProductServiceImpl implements ProductService {
                     "Stock inicial al crear producto",
                     "system"
             );
-            // ✅ No actualizar stock manualmente aquí porque registerInventoryMovement ya lo hace
         }
 
-        // ✅ Recargar el producto con el stock actualizado
         finalProduct = productRepository.findById(finalProduct.getId()).orElse(finalProduct);
 
         log.info("Product created with ID: {} and SKU: {}", finalProduct.getId(), finalProduct.getSku());
@@ -172,7 +171,6 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductSummaryResponseDTO> findByProductSupplierSku(String supplierSku) {
         log.info("Buscando productos por supplierSku en ProductSupplier: {}", supplierSku);
 
-        // ✅ Buscar en ProductSupplier, NO en Product
         List<ProductSupplier> productSuppliers = productSupplierRepository.findBySupplierSkuContaining(supplierSku);
 
         List<Product> products = productSuppliers.stream()
@@ -351,7 +349,7 @@ public class ProductServiceImpl implements ProductService {
                                                                  String dateFrom, String dateTo) {
         log.info("Searching ALL products summary with filters (including inactive) - supplierSku: {}", supplierSku);
 
-      LocalDateTime startDate = null;
+        LocalDateTime startDate = null;
         LocalDateTime endDate = null;
 
         if (dateFrom != null && !dateFrom.isEmpty()) {
@@ -365,6 +363,107 @@ public class ProductServiceImpl implements ProductService {
                 name, sku, supplierSku, minPrice, maxPrice, subcategoryId, supplierId, startDate, endDate);
 
         return productMapper.toSummaryDTOList(products);
+    }
+
+    // ========== MÉTODOS DE PAGINACIÓN Y BÚSQUEDA ==========
+    @Override
+    @Transactional(readOnly = true)
+    public PagedProductResponseDTO getProductsPaged(
+            String name, String sku, String supplierSku,
+            BigDecimal minPrice, BigDecimal maxPrice,
+            Long subcategoryId, Long categoryId, // <-- Recibimos el parámetro
+            Long supplierId, Boolean active, Integer minStock, Integer maxStock,
+            Pageable pageable) {
+
+        log.info("🔍 Búsqueda - name: '{}', categoryId: {}, subcategoryId: {}", name, categoryId, subcategoryId);
+
+        String searchName = (name != null && !name.trim().isEmpty()) ? name.trim() : null;
+        String searchSku = searchName;
+        String searchSupplierSku = (supplierSku != null && !supplierSku.trim().isEmpty()) ? supplierSku.trim() : null;
+
+        // Conversión de filtros de stock
+        Integer stockMin = null;
+        Integer stockMax = null;
+        if (minStock != null) {
+            if (minStock == 0) {
+                stockMax = 0;
+            } else if (minStock == 10) {
+                stockMin = 1;
+                stockMax = 9;
+            }
+        }
+        if (maxStock != null) {
+            stockMax = maxStock;
+        }
+
+        // 1. Obtenemos la página específica usando tanto subcategoryId como categoryId
+        Page<Product> productPage = productRepository.findProductsWithFilters(
+                searchName, searchSku, searchSupplierSku, minPrice, maxPrice,
+                subcategoryId, categoryId, supplierId, active, stockMin, stockMax, pageable);
+
+        // 2. Obtenemos todo el universo sin paginar para calcular las estadísticas globales bajo el mismo filtro
+        Page<Product> allFilteredPage = productRepository.findProductsWithFilters(
+                searchName, searchSku, searchSupplierSku, minPrice, maxPrice,
+                subcategoryId, categoryId, supplierId, active, stockMin, stockMax, Pageable.unpaged());
+
+        List<Product> allFilteredProducts = allFilteredPage.getContent();
+
+        // 3. Métricas en memoria sobre el universo total afectado
+        long activeCount = allFilteredProducts.stream().filter(Product::getActive).count();
+        long inactiveCount = allFilteredProducts.stream().filter(p -> !p.getActive()).count();
+        long lowStockCount = allFilteredProducts.stream().filter(p -> p.getCurrentStock() < 10 && p.getCurrentStock() > 0).count();
+        long outOfStockCount = allFilteredProducts.stream().filter(p -> p.getCurrentStock() == 0).count();
+
+        // 4. Mapeo a DTO list
+        List<ProductSummaryResponseDTO> contentDTOs = productMapper.toSummaryDTOList(productPage.getContent());
+
+        return PagedProductResponseDTO.builder()
+                .content(contentDTOs)
+                .totalElements(productPage.getTotalElements())
+                .totalPages(productPage.getTotalPages())
+                .currentPage(productPage.getNumber())
+                .pageSize(productPage.getSize())
+                .hasNext(productPage.hasNext())
+                .hasPrevious(productPage.hasPrevious())
+                .totalProducts(productPage.getTotalElements())
+                .activeProducts(activeCount)
+                .inactiveProducts(inactiveCount)
+                .lowStockProducts(lowStockCount)
+                .outOfStockProducts(outOfStockCount)
+                .build();
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductSummaryResponseDTO> searchProductsGeneral(
+            String query, BigDecimal minPrice, BigDecimal maxPrice,
+            Long categoryId, Long supplierId, Boolean active, Pageable pageable) {
+
+        log.info("🔍 Búsqueda general - query: '{}', categoryId: {}", query, categoryId);
+
+        // ✅ Buscar en ambos campos simultáneamente
+        String searchTerm = null;
+
+        if (query != null && !query.trim().isEmpty()) {
+            searchTerm = query.trim();
+        }
+
+        Page<Product> productPage = productRepository.findProductsWithFilters(
+                searchTerm,  // name
+                searchTerm,  // sku - buscar en ambos
+                null,        // supplierSku
+                minPrice, maxPrice,
+                null,        // subcategoryId
+                categoryId,  // categoryId
+                supplierId,
+                active,
+                null,        // minStock
+                null,        // maxStock
+                pageable);
+
+        log.info("✅ Resultados encontrados para '{}': {}", query, productPage.getTotalElements());
+        return productPage.map(productMapper::toSummaryDTO);
     }
 
     // ========== GESTIÓN DE STOCK CON REGISTRO DE MOVIMIENTOS ==========
@@ -381,13 +480,9 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException("Quantity must be greater than 0");
         }
 
-        // ✅ Registrar movimiento de inventario (ENTRADA)
-        // El inventoryService.registerEntry ya actualiza el stock automáticamente
         BigDecimal unitCost = product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO;
         registerInventoryMovement(productId, quantity, unitCost, reason, user);
 
-        // ✅ NO actualizar stock manualmente aquí (el inventoryService ya lo hizo)
-        // Recargar el producto para obtener el stock actualizado
         Product updatedProduct = productRepository.findById(productId).orElse(product);
 
         log.info("Stock added to product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
@@ -410,12 +505,8 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException("Insufficient stock. Available: " + product.getCurrentStock());
         }
 
-        // ✅ Registrar movimiento de inventario (SALIDA)
-        // El inventoryService.registerExit ya actualiza el stock automáticamente
         registerInventoryExitMovement(productId, quantity, reason, user);
 
-        // ✅ NO actualizar stock manualmente aquí (el inventoryService ya lo hizo)
-        // Recargar el producto para obtener el stock actualizado
         Product updatedProduct = productRepository.findById(productId).orElse(product);
 
         log.info("Stock removed from product ID: {}. New stock: {}", productId, updatedProduct.getCurrentStock());
@@ -424,9 +515,6 @@ public class ProductServiceImpl implements ProductService {
 
     // ========== MÉTODOS PRIVADOS DE INVENTARIO ==========
 
-    /**
-     * Registra un movimiento de entrada de stock (SOLO EL MOVIMIENTO, NO actualiza stock)
-     */
     private void registerInventoryMovement(Long productId, int quantity, BigDecimal unitCost, String reason, String user) {
         try {
             StockEntryRequestDTO stockEntry = new StockEntryRequestDTO(
@@ -440,9 +528,6 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    /**
-     * Registra un movimiento de salida de stock (SOLO EL MOVIMIENTO, NO actualiza stock)
-     */
     private void registerInventoryExitMovement(Long productId, int quantity, String reason, String user) {
         try {
             StockExitRequestDTO stockExit = new StockExitRequestDTO(
@@ -526,7 +611,7 @@ public class ProductServiceImpl implements ProductService {
     @Cacheable(value = "productDetails", key = "#id")
     public ProductDetailResponseDTO getProductDetailById(Long id) {
         log.info("Retrieving product detail for ID: {} (including inactive)", id);
-        Product product = findProductById(id);  // ✅ Cambiar de findActiveProductById a findProductById
+        Product product = findProductById(id);
         return productMapper.toDetailDTO(product);
     }
 
