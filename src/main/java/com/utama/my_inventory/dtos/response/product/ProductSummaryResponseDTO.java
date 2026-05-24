@@ -49,5 +49,8 @@ public record ProductSummaryResponseDTO(
         Boolean active,
 
         @Schema(description = "Fecha de creación", example = "2024-01-15T10:30:00")
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+
+          @Schema(description = "URL de la imagen principal", example = "https://res.cloudinary.com/...")
+                String imageUrl
 ) {}

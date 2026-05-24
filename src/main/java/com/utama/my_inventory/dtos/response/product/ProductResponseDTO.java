@@ -85,7 +85,9 @@ public record ProductResponseDTO(
         Boolean hasStock,
 
         @Schema(description = "Indica si el stock es bajo", example = "false")
-        Boolean lowStock
+        Boolean lowStock,
+
+        String imageUrl
 ) {
 
         public static ProductResponseDTOBuilder builder() {

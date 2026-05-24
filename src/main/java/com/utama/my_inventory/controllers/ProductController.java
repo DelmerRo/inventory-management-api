@@ -42,7 +42,6 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -55,12 +54,22 @@ public class ProductController {
     private final ProductService productService;
     private final InventoryService inventoryService;
     private final MultimediaService multimediaService;
-    private final ProductRepository productRepository;
+    private final ProductRepository productRepository; // Solo para debug
+
+    // Helper para crear Pageable con validación de campo de ordenamiento
+    private Pageable createPageable(int page, int size, String sortField, String sortDirection) {
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String validField = switch (sortField) {
+            case "name", "salePrice", "currentStock", "createdAt", "id" -> sortField;
+            default -> "createdAt";
+        };
+        return PageRequest.of(page, size, Sort.by(direction, validField));
+    }
 
     // ========== CRUD BÁSICO ==========
 
     @PostMapping
-    @Operation(summary = "Crear nuevo producto", description = "Crea un producto con múltiples proveedores asociados")
+    @Operation(summary = "Crear nuevo producto")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Producto creado exitosamente"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos o falta proveedor principal"),
@@ -70,67 +79,36 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Datos del producto",
                     required = true,
-                    content = @Content(examples = {
-                            @ExampleObject(
-                                    name = "Ejemplo completo",
-                                    value = """
-                                    {
-                                        "name": "Laptop HP EliteBook",
-                                        "description": "Laptop empresarial con 16GB RAM",
-                                        "costPrice": 1200.50,
-                                        "salePrice": 1500.00,
-                                        "currentStock": 10,
-                                        "subcategoryId": 1,
-                                        "suppliers": [
-                                            {
-                                                "supplierId": 1,
-                                                "supplierSku": "HP-ELITE-001",
-                                                "isPrimary": true,
-                                                "notes": "Proveedor oficial"
-                                            }
-                                        ],
-                                        "weight": 1.5,
-                                        "length": 35.50,
-                                        "width": 25.00,
-                                        "height": 2.50
-                                    }
-                                    """
-                            )
-                    })
-            )
+                    content = @Content(examples = @ExampleObject(name = "Ejemplo completo", value = """
+                            {
+                                "name": "Laptop HP EliteBook",
+                                "description": "Laptop empresarial con 16GB RAM",
+                                "costPrice": 1200.50,
+                                "salePrice": 1500.00,
+                                "currentStock": 10,
+                                "subcategoryId": 1,
+                                "suppliers": [{"supplierId": 1, "supplierSku": "HP-ELITE-001", "isPrimary": true, "notes": "Proveedor oficial"}],
+                                "weight": 1.5, "length": 35.50, "width": 25.00, "height": 2.50
+                            }
+                            """)))
             @Valid @RequestBody ProductRequestDTO requestDTO) {
-
-        ProductResponseDTO product = productService.createProduct(requestDTO);
-        return ExtendedBaseResponse.created(product, "Producto creado exitosamente")
+        return ExtendedBaseResponse.created(productService.createProduct(requestDTO), "Producto creado exitosamente")
                 .toResponseEntity();
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos los productos (resumen)")
     public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getAllProducts() {
-        List<ProductSummaryResponseDTO> products = productService.getAllProductsSummary();
-        return ExtendedBaseResponse.ok(products, "Productos obtenidos correctamente")
+        return ExtendedBaseResponse.ok(productService.getAllProductsSummary(), "Productos obtenidos correctamente")
                 .toResponseEntity();
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener producto por ID (detalle esencial)")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Producto encontrado"),
-            @ApiResponse(responseCode = "404", description = "Producto no encontrado")
-    })
-    public ResponseEntity<ExtendedBaseResponse<ProductDetailResponseDTO>> getProductById(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id) {
-
-        ProductDetailResponseDTO product = productService.getProductDetailById(id);
-        return ExtendedBaseResponse.ok(product, "Producto encontrado")
+    public ResponseEntity<ExtendedBaseResponse<ProductDetailResponseDTO>> getProductById(@PathVariable Long id) {
+        return ExtendedBaseResponse.ok(productService.getProductDetailById(id), "Producto encontrado")
                 .toResponseEntity();
     }
 
-    // ProductController.java
     @GetMapping("/paged")
-    @Operation(summary = "Obtener productos paginados con filtros y estadísticas globales")
     public ResponseEntity<ExtendedBaseResponse<PagedProductResponseDTO>> getProductsPaged(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String sku,
@@ -138,7 +116,7 @@ public class ProductController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) Long subcategoryId,
-            @RequestParam(required = false) Long categoryId, // <-- Agregado el parámetro aquí
+            @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) Integer minStock,
@@ -148,354 +126,195 @@ public class ProductController {
             @RequestParam(defaultValue = "createdAt") String sortField,
             @RequestParam(defaultValue = "desc") String sortDirection) {
 
-        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-
-        // Pasamos categoryId en la posición correspondiente
+        Pageable pageable = createPageable(page, size, sortField, sortDirection);
         PagedProductResponseDTO pagedResponse = productService.getProductsPaged(
-                name, sku, supplierSku, minPrice, maxPrice, subcategoryId, categoryId, supplierId, active, minStock, maxStock, pageable);
-
+                name, sku, supplierSku, minPrice, maxPrice, subcategoryId, categoryId,
+                supplierId, active, minStock, maxStock, pageable);
         return ExtendedBaseResponse.ok(pagedResponse, "Búsqueda paginada completada con éxito")
                 .toResponseEntity();
     }
 
-    // ProductController.java - Agregar este nuevo endpoint
     @GetMapping("/search-general")
-    @Operation(summary = "Buscar productos por término general (nombre o SKU)")
     public ResponseEntity<ExtendedBaseResponse<Page<ProductSummaryResponseDTO>>> searchProductsGeneral(
-            @Parameter(description = "Término de búsqueda (nombre o SKU)") @RequestParam(required = false) String query,
-            @Parameter(description = "Precio mínimo") @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Precio máximo") @RequestParam(required = false) BigDecimal maxPrice,
-            @Parameter(description = "ID de subcategoría") @RequestParam(required = false) Long subcategoryId,
-            @Parameter(description = "ID de proveedor") @RequestParam(required = false) Long supplierId,
-            @Parameter(description = "Estado del producto") @RequestParam(required = false) Boolean active,
-            @Parameter(description = "Número de página") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Tamaño de página") @RequestParam(defaultValue = "15") int size,
-            @Parameter(description = "Campo de ordenamiento") @RequestParam(defaultValue = "createdAt") String sortField,
-            @Parameter(description = "Dirección de ordenamiento") @RequestParam(defaultValue = "desc") String sortDirection) {
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Long subcategoryId,
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(defaultValue = "createdAt") String sortField,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
 
-        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-
+        Pageable pageable = createPageable(page, size, sortField, sortDirection);
         Page<ProductSummaryResponseDTO> productPage = productService.searchProductsGeneral(
                 query, minPrice, maxPrice, subcategoryId, supplierId, active, pageable);
-
-        return ExtendedBaseResponse.ok(productPage, "Búsqueda completada")
-                .toResponseEntity();
-    }
-
-    private String validateSortField(String sortField) {
-        Set<String> allowedFields = Set.of("name", "salePrice", "currentStock", "createdAt", "id");
-        return allowedFields.contains(sortField) ? sortField : "createdAt";
+        return ExtendedBaseResponse.ok(productPage, "Búsqueda completada").toResponseEntity();
     }
 
     @GetMapping("/sku/{sku}")
-    @Operation(summary = "Obtener producto por SKU (detalle esencial)")
-    public ResponseEntity<ExtendedBaseResponse<ProductDetailResponseDTO>> getProductBySku(
-            @Parameter(description = "SKU del producto", example = "LIV-DOR-00001")
-            @PathVariable String sku) {
-
-        ProductDetailResponseDTO product = productService.getProductDetailBySku(sku);
-        return ExtendedBaseResponse.ok(product, "Producto encontrado")
+    public ResponseEntity<ExtendedBaseResponse<ProductDetailResponseDTO>> getProductBySku(@PathVariable String sku) {
+        return ExtendedBaseResponse.ok(productService.getProductDetailBySku(sku), "Producto encontrado")
                 .toResponseEntity();
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Actualizar producto existente")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Producto actualizado"),
-            @ApiResponse(responseCode = "404", description = "Producto no encontrado"),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos")
-    })
     public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> updateProduct(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id,
-            @Valid @RequestBody ProductRequestDTO requestDTO) {
-
-        ProductResponseDTO product = productService.updateProduct(id, requestDTO);
-        return ExtendedBaseResponse.ok(product, "Producto actualizado exitosamente")
+            @PathVariable Long id, @Valid @RequestBody ProductRequestDTO requestDTO) {
+        return ExtendedBaseResponse.ok(productService.updateProduct(id, requestDTO), "Producto actualizado exitosamente")
                 .toResponseEntity();
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Eliminar producto (soft delete)")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Producto eliminado"),
-            @ApiResponse(responseCode = "404", description = "Producto no encontrado")
-    })
-    public ResponseEntity<ExtendedBaseResponse<Void>> deleteProduct(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id) {
-
+    public ResponseEntity<ExtendedBaseResponse<Void>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
-        return ExtendedBaseResponse.<Void>ok(null, "Producto eliminado exitosamente")
-                .toResponseEntity();
+        return ExtendedBaseResponse.<Void>ok(null, "Producto eliminado exitosamente").toResponseEntity();
     }
 
     @PatchMapping("/{id}/toggle-status")
-    @Operation(summary = "Activar/desactivar producto")
-    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> toggleProductStatus(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id) {
-
+    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> toggleProductStatus(@PathVariable Long id) {
         ProductResponseDTO product = productService.toggleProductStatus(id);
-        String message = product.active()
-                ? "Producto activado exitosamente"
-                : "Producto desactivado exitosamente";
-
-        return ExtendedBaseResponse.ok(product, message)
-                .toResponseEntity();
+        String message = product.active() ? "Producto activado exitosamente" : "Producto desactivado exitosamente";
+        return ExtendedBaseResponse.ok(product, message).toResponseEntity();
     }
 
-    // ========== CONSULTAS POR RELACIONES (RESUMEN) ==========
+    // ========== CONSULTAS POR RELACIONES ==========
 
     @GetMapping("/subcategory/{subcategoryId}")
-    @Operation(summary = "Obtener productos por subcategoría (resumen)")
-    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySubcategory(
-            @Parameter(description = "ID de la subcategoría", example = "1")
-            @PathVariable Long subcategoryId) {
-
-        List<ProductSummaryResponseDTO> products = productService.getProductsBySubcategorySummary(subcategoryId);
-        return ExtendedBaseResponse.ok(products, "Productos obtenidos por subcategoría")
+    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySubcategory(@PathVariable Long subcategoryId) {
+        return ExtendedBaseResponse.ok(productService.getProductsBySubcategorySummary(subcategoryId), "Productos obtenidos por subcategoría")
                 .toResponseEntity();
     }
 
     @GetMapping("/supplier/{supplierId}")
-    @Operation(summary = "Obtener productos por proveedor (resumen)")
-    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplier(
-            @Parameter(description = "ID del proveedor", example = "1")
-            @PathVariable Long supplierId) {
-
-        List<ProductSummaryResponseDTO> products = productService.getProductsBySupplierSummary(supplierId);
-        return ExtendedBaseResponse.ok(products, "Productos obtenidos por proveedor")
+    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplier(@PathVariable Long supplierId) {
+        return ExtendedBaseResponse.ok(productService.getProductsBySupplierSummary(supplierId), "Productos obtenidos por proveedor")
                 .toResponseEntity();
     }
 
     @GetMapping("/low-stock")
-    @Operation(summary = "Obtener productos con stock bajo (resumen)")
     public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getLowStockProducts(
-            @Parameter(description = "Umbral para considerar stock bajo", example = "10")
             @RequestParam(defaultValue = "10") int threshold) {
-
-        List<ProductSummaryResponseDTO> products = productService.getLowStockProductsSummary(threshold);
-        return ExtendedBaseResponse.ok(products, "Productos con stock bajo obtenidos")
+        return ExtendedBaseResponse.ok(productService.getLowStockProductsSummary(threshold), "Productos con stock bajo obtenidos")
                 .toResponseEntity();
     }
 
-    // ========== BÚSQUEDA (RESUMEN) ==========
+    // ========== BÚSQUEDA (resumen) ==========
 
     @GetMapping("/search")
-    @Operation(summary = "Buscar productos con filtros (resumen)")
     public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> searchProducts(
-            @Parameter(description = "Nombre del producto") @RequestParam(required = false) String name,
-            @Parameter(description = "SKU del producto") @RequestParam(required = false) String sku,
-            @Parameter(description = "SKU del proveedor") @RequestParam(required = false) String supplierSku,
-            @Parameter(description = "Precio mínimo") @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Precio máximo") @RequestParam(required = false) BigDecimal maxPrice,
-            @Parameter(description = "ID de subcategoría") @RequestParam(required = false) Long subcategoryId,
-            @Parameter(description = "ID de proveedor") @RequestParam(required = false) Long supplierId,
-            @Parameter(description = "Fecha desde (YYYY-MM-DD)") @RequestParam(required = false) String dateFrom,
-            @Parameter(description = "Fecha hasta (YYYY-MM-DD)") @RequestParam(required = false) String dateTo) {
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String sku,
+            @RequestParam(required = false) String supplierSku,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Long subcategoryId,
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo) {
 
         List<ProductSummaryResponseDTO> products = productService.searchProductsSummary(
                 name, sku, supplierSku, minPrice, maxPrice, subcategoryId, supplierId, dateFrom, dateTo);
-
-        return ExtendedBaseResponse.ok(products, "Búsqueda completada")
-                .toResponseEntity();
+        return ExtendedBaseResponse.ok(products, "Búsqueda completada").toResponseEntity();
     }
 
     @GetMapping("/by-supplier-sku/{supplierSku}")
-    @Operation(summary = "Buscar productos por SKU del proveedor (desde ProductSupplier)")
-    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplierSku(
-            @Parameter(description = "SKU del proveedor") @PathVariable String supplierSku) {
-
-        List<ProductSummaryResponseDTO> products = productService.findByProductSupplierSku(supplierSku);
-        return ExtendedBaseResponse.ok(products, "Productos encontrados por SKU de proveedor")
+    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplierSku(@PathVariable String supplierSku) {
+        return ExtendedBaseResponse.ok(productService.findByProductSupplierSku(supplierSku), "Productos encontrados por SKU de proveedor")
                 .toResponseEntity();
     }
 
     // ========== GESTIÓN DE PROVEEDORES ==========
 
     @GetMapping("/{id}/suppliers")
-    @Operation(summary = "Obtener proveedores de un producto")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Proveedores encontrados"),
-            @ApiResponse(responseCode = "404", description = "Producto no encontrado")
-    })
-    public ResponseEntity<ExtendedBaseResponse<List<SupplierAssociationResponseDTO>>> getProductSuppliers(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id) {
-
-        List<SupplierAssociationResponseDTO> suppliers = productService.getProductSuppliers(id);
-        return ExtendedBaseResponse.ok(suppliers, "Proveedores obtenidos correctamente")
+    public ResponseEntity<ExtendedBaseResponse<List<SupplierAssociationResponseDTO>>> getProductSuppliers(@PathVariable Long id) {
+        return ExtendedBaseResponse.ok(productService.getProductSuppliers(id), "Proveedores obtenidos correctamente")
                 .toResponseEntity();
     }
 
     @PostMapping("/{id}/suppliers")
-    @Operation(summary = "Agregar un proveedor a un producto existente")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Proveedor agregado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Proveedor ya asociado o datos inválidos"),
-            @ApiResponse(responseCode = "404", description = "Producto o proveedor no encontrado")
-    })
     public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> addSupplierToProduct(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id,
-            @Valid @RequestBody SupplierAssociationDTO supplierDTO) {
-
-        ProductResponseDTO product = productService.addSupplierToProduct(id, supplierDTO);
-        return ExtendedBaseResponse.ok(product, "Proveedor agregado exitosamente")
+            @PathVariable Long id, @Valid @RequestBody SupplierAssociationDTO supplierDTO) {
+        return ExtendedBaseResponse.ok(productService.addSupplierToProduct(id, supplierDTO), "Proveedor agregado exitosamente")
                 .toResponseEntity();
     }
 
     @DeleteMapping("/{id}/suppliers/{supplierId}")
-    @Operation(summary = "Eliminar un proveedor de un producto")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Proveedor eliminado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "No se puede eliminar el único proveedor"),
-            @ApiResponse(responseCode = "404", description = "Producto o relación no encontrada")
-    })
-    public ResponseEntity<ExtendedBaseResponse<Void>> removeSupplierFromProduct(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id,
-            @Parameter(description = "ID del proveedor", example = "1")
-            @PathVariable Long supplierId) {
-
+    public ResponseEntity<ExtendedBaseResponse<Void>> removeSupplierFromProduct(@PathVariable Long id, @PathVariable Long supplierId) {
         productService.removeSupplierFromProduct(id, supplierId);
-        return ExtendedBaseResponse.<Void>ok(null, "Proveedor eliminado exitosamente")
-                .toResponseEntity();
+        return ExtendedBaseResponse.<Void>ok(null, "Proveedor eliminado exitosamente").toResponseEntity();
     }
 
     @PatchMapping("/{id}/suppliers/{supplierId}/sku")
-    @Operation(summary = "Actualizar el SKU de un proveedor para un producto")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "SKU actualizado exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Producto o relación no encontrada")
-    })
     public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> updateSupplierSku(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id,
-            @Parameter(description = "ID del proveedor", example = "1")
-            @PathVariable Long supplierId,
-            @Parameter(description = "Nuevo SKU del proveedor", example = "HP-ELITE-002")
-            @RequestParam String supplierSku) {
-
-        ProductResponseDTO product = productService.updateSupplierSku(id, supplierId, supplierSku);
-        return ExtendedBaseResponse.ok(product, "SKU de proveedor actualizado exitosamente")
+            @PathVariable Long id, @PathVariable Long supplierId, @RequestParam String supplierSku) {
+        return ExtendedBaseResponse.ok(productService.updateSupplierSku(id, supplierId, supplierSku), "SKU de proveedor actualizado exitosamente")
                 .toResponseEntity();
     }
 
     // ========== GESTIÓN DE STOCK ==========
 
     @PostMapping("/add-stock")
-    @Operation(summary = "Agregar stock a producto")
-    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> addStock(
-            @Valid @RequestBody StockEntryRequestDTO request) {
-
-        ProductResponseDTO product = productService.addStock(
-                request.productId(), request.quantity(), request.reason(), request.user());
-        return ExtendedBaseResponse.ok(product, "Stock agregado exitosamente")
-                .toResponseEntity();
+    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> addStock(@Valid @RequestBody StockEntryRequestDTO request) {
+        return ExtendedBaseResponse.ok(
+                productService.addStock(request.productId(), request.quantity(), request.reason(), request.user()),
+                "Stock agregado exitosamente").toResponseEntity();
     }
 
     @PostMapping("/remove-stock")
-    @Operation(summary = "Remover stock de producto")
-    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> removeStock(
-            @Valid @RequestBody StockExitRequestDTO request) {
-
-        ProductResponseDTO product = productService.removeStock(
-                request.productId(),
-                request.quantity(),
-                request.reason(),
-                request.user()
-        );
-
-        return ExtendedBaseResponse.ok(product, "Stock removido exitosamente")
-                .toResponseEntity();
+    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> removeStock(@Valid @RequestBody StockExitRequestDTO request) {
+        return ExtendedBaseResponse.ok(
+                productService.removeStock(request.productId(), request.quantity(), request.reason(), request.user()),
+                "Stock removido exitosamente").toResponseEntity();
     }
 
     // ========== ESTADÍSTICAS ==========
 
     @GetMapping("/statistics")
-    @Operation(summary = "Obtener estadísticas de productos")
     public ResponseEntity<ExtendedBaseResponse<Map<String, Object>>> getStatistics() {
-
-        Long totalProducts = productService.getTotalProductCount();
-        Long totalStock = productService.getTotalStock();
-        BigDecimal totalValue = productService.getTotalInventoryValue();
-
         Map<String, Object> stats = Map.of(
-                "totalProducts", totalProducts,
-                "totalStock", totalStock,
-                "totalInventoryValue", totalValue
+                "totalProducts", productService.getTotalProductCount(),
+                "totalStock", productService.getTotalStock(),
+                "totalInventoryValue", productService.getTotalInventoryValue()
         );
-
-        return ExtendedBaseResponse.ok(stats, "Estadísticas obtenidas")
-                .toResponseEntity();
+        return ExtendedBaseResponse.ok(stats, "Estadísticas obtenidas").toResponseEntity();
     }
 
     // ========== HISTORIAL DE INVENTARIO ==========
 
     @GetMapping("/{id}/inventory")
-    @Operation(summary = "Obtener historial de inventario de un producto")
-    public ResponseEntity<ExtendedBaseResponse<List<InventoryMovementResponseDTO>>> getProductInventoryHistory(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id) {
-
-        List<InventoryMovementResponseDTO> history = inventoryService.getProductHistory(id);
-        return ExtendedBaseResponse.ok(history, "Historial de inventario obtenido")
+    public ResponseEntity<ExtendedBaseResponse<List<InventoryMovementResponseDTO>>> getProductInventoryHistory(@PathVariable Long id) {
+        return ExtendedBaseResponse.ok(inventoryService.getProductHistory(id), "Historial de inventario obtenido")
                 .toResponseEntity();
     }
 
-    // ========== MULTIMEDIA (IMÁGENES) ==========
+    // ========== MULTIMEDIA ==========
 
     @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Subir imagen al producto")
     public ResponseEntity<ExtendedBaseResponse<MultimediaUploadResponseDTO>> uploadProductImage(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
-
-        MultimediaUploadResponseDTO result = multimediaService.uploadFile(id, file, "IMAGE");
-        return ExtendedBaseResponse.ok(result, "Imagen subida exitosamente")
+            @PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        return ExtendedBaseResponse.ok(multimediaService.uploadFile(id, file, "IMAGE"), "Imagen subida exitosamente")
                 .toResponseEntity();
     }
 
     @GetMapping("/{id}/images")
-    @Operation(summary = "Listar imágenes del producto")
-    public ResponseEntity<ExtendedBaseResponse<List<MultimediaFileResponseDTO>>> getProductImages(
-            @Parameter(description = "ID del producto", example = "1")
-            @PathVariable Long id) {
-
-        List<MultimediaFileResponseDTO> images = multimediaService.getProductFilesByType(id, "IMAGE");
-        return ExtendedBaseResponse.ok(images, "Imágenes obtenidas correctamente")
+    public ResponseEntity<ExtendedBaseResponse<List<MultimediaFileResponseDTO>>> getProductImages(@PathVariable Long id) {
+        return ExtendedBaseResponse.ok(multimediaService.getProductFilesByType(id, "IMAGE"), "Imágenes obtenidas correctamente")
                 .toResponseEntity();
     }
 
-    @Operation(
-            summary = "Crear producto rápido desde pedido de compra",
-            description = "Crea un producto con datos mínimos (nombre, SKU proveedor, subcategoría)"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "✅ Producto creado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "❌ Datos inválidos"),
-            @ApiResponse(responseCode = "409", description = "❌ SKU de proveedor ya existe")
-    })
     @PostMapping("/quick")
-    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> createQuickProduct(
-            @Valid @RequestBody QuickProductRequestDTO requestDTO) {
-
-        ProductResponseDTO product = productService.createQuickProduct(requestDTO);
-        return ExtendedBaseResponse.created(product, "Producto creado exitosamente")
+    public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> createQuickProduct(@Valid @RequestBody QuickProductRequestDTO requestDTO) {
+        return ExtendedBaseResponse.created(productService.createQuickProduct(requestDTO), "Producto creado exitosamente")
                 .toResponseEntity();
     }
 
+    // ========== DEBUG (solo para desarrollo) ==========
     @GetMapping("/debug/{id}")
     public ResponseEntity<?> debugProduct(@PathVariable Long id) {
         Product product = productRepository.findById(id).orElse(null);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
+        if (product == null) return ResponseEntity.notFound().build();
 
         Map<String, Object> debug = new HashMap<>();
         debug.put("productId", product.getId());
@@ -509,8 +328,6 @@ public class ProductController {
                         "isPrimary", ps.getIsPrimary()
                 ))
                 .collect(Collectors.toList()));
-
         return ResponseEntity.ok(debug);
     }
-
 }

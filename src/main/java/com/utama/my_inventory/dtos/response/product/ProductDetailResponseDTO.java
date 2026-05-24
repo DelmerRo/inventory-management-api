@@ -88,5 +88,9 @@ public record ProductDetailResponseDTO(
         Boolean hasStock,
 
         @Schema(description = "Indica si el stock es bajo", example = "false")
-        Boolean lowStock
+        Boolean lowStock,
+
+        @Schema(description = "URL de la imagen principal", example = "https://res.cloudinary.com/...")
+        String imageUrl
+
 ) {}

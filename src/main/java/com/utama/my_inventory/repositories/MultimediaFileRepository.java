@@ -13,19 +13,5 @@ import java.util.Optional;
 
 @Repository
 public interface MultimediaFileRepository extends JpaRepository<MultimediaFile, Long> {
-
-    // Búsquedas por producto
-    List<MultimediaFile> findByProductIdOrderByUploadedAtDesc(Long productId);
-    List<MultimediaFile> findByProductIdAndFileTypeOrderByUploadedAtDesc(Long productId, FileType fileType);
-
-    // Verificaciones
-    boolean existsByProductIdAndFileUrl(Long productId, String fileUrl);
-
-    // Consultas personalizadas
-    @Query("SELECT COUNT(mf) FROM MultimediaFile mf WHERE mf.product.id = :productId")
-    Long countByProductId(@Param("productId") Long productId);
-
-    @Modifying
-    @Query("DELETE FROM MultimediaFile mf WHERE mf.product.id = :productId")
-    void deleteAllByProductId(@Param("productId") Long productId);
+    List<MultimediaFile> findByProductIdAndFileType(Long productId, FileType fileType);
 }

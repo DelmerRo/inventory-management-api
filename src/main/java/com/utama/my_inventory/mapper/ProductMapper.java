@@ -26,6 +26,7 @@ public interface ProductMapper {
     @Mapping(target = "hasStock", expression = "java(product.hasStock())")
     @Mapping(target = "lowStock", expression = "java(product.isLowStock(10))")
     @Mapping(target = "suppliers", source = "productSuppliers", qualifiedByName = "mapProductSuppliers")
+    @Mapping(target = "imageUrl", expression = "java(getFirstImageUrl(product))")
     ProductResponseDTO toResponseDTO(Product product);
 
     List<ProductResponseDTO> toResponseDTOList(List<Product> products);
@@ -40,28 +41,54 @@ public interface ProductMapper {
     @Mapping(target = "suppliers", source = "productSuppliers", qualifiedByName = "mapProductSuppliers")
     @Mapping(target = "primarySupplierName", expression = "java(product.getPrimarySupplier() != null ? product.getPrimarySupplier().getName() : null)")
     @Mapping(target = "primarySupplierSku", expression = "java(product.getPrimarySupplierSku())")
+    @Mapping(target = "imageUrl", expression = "java(getFirstImageUrl(product))")
     ProductDetailResponseDTO toDetailDTO(Product product);
 
     List<ProductDetailResponseDTO> toDetailDTOList(List<Product> products);
 
-    // ========== PARA LISTADOS (SUMMARY) ==========
-    @Mapping(target = "subcategoryName", source = "subcategory.name")
-    @Mapping(target = "primarySupplierName", expression = "java(product.getPrimarySupplier() != null ? product.getPrimarySupplier().getName() : null)")
-    @Mapping(target = "primarySupplierSku", expression = "java(product.getPrimarySupplierSku())")
-    @Mapping(target = "suppliersCount", expression = "java(product.getProductSuppliers() != null ? product.getProductSuppliers().size() : 0)")
-    @Mapping(target = "hasStock", expression = "java(product.getCurrentStock() > 0)")
-    @Mapping(target = "createdAt", source = "createdAt")
-    @Mapping(target = "costPrice", source = "costPrice")  // ✅ AGREGAR ESTA LÍNEA
-    ProductSummaryResponseDTO toSummaryDTO(Product product);
+    // ========== PARA LISTADOS (SUMMARY) - MÉTODO MANUAL ==========
+    // No usamos @Mapping para imageUrl para evitar el error
 
-    List<ProductSummaryResponseDTO> toSummaryDTOList(List<Product> products);
+    default ProductSummaryResponseDTO toSummaryDTO(Product product) {
+        String imageUrl = getFirstImageUrl(product);
+        return new ProductSummaryResponseDTO(
+                product.getId(),
+                product.getSku(),
+                product.getName(),
+                product.getSalePrice(),
+                product.getCostPrice(),
+                product.getCurrentStock(),
+                product.getSubcategory() != null ? product.getSubcategory().getName() : null,
+                product.getPrimarySupplier() != null ? product.getPrimarySupplier().getName() : null,
+                product.getPrimarySupplierSku(),
+                product.getProductSuppliers() != null ? product.getProductSuppliers().size() : 0,
+                product.getCurrentStock() > 0,
+                product.getActive(),
+                product.getCreatedAt(),
+                imageUrl
+        );
+    }
+
+    default List<ProductSummaryResponseDTO> toSummaryDTOList(List<Product> products) {
+        if (products == null) return List.of();
+        return products.stream()
+                .map(this::toSummaryDTO)
+                .toList();
+    }
+
+    // ========== MÉTODO HELPER PARA OBTENER LA PRIMERA IMAGEN ==========
+    default String getFirstImageUrl(Product product) {
+        if (product.getMultimediaFiles() == null || product.getMultimediaFiles().isEmpty()) {
+            return null;
+        }
+        return product.getMultimediaFiles().get(0).getFileUrl();
+    }
 
     // ========== MÉTODOS AUXILIARES ==========
 
     @Named("toSubcategoryEssentialsDTO")
     static SubcategoryEssentialsDTO toSubcategoryEssentialsDTO(Subcategory subcategory) {
         if (subcategory == null) return null;
-
         return SubcategoryEssentialsDTO.builder()
                 .id(subcategory.getId())
                 .name(subcategory.getName())
@@ -74,7 +101,6 @@ public interface ProductMapper {
     @Named("mapProductSuppliers")
     static List<SupplierAssociationResponseDTO> mapProductSuppliers(List<ProductSupplier> productSuppliers) {
         if (productSuppliers == null) return List.of();
-
         return productSuppliers.stream()
                 .map(ps -> SupplierAssociationResponseDTO.builder()
                         .id(ps.getId())

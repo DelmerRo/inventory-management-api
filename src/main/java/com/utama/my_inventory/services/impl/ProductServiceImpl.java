@@ -289,22 +289,6 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toSummaryDTOList(products);
     }
 
-    @Transactional(readOnly = true)
-    @Cacheable(value = "productSummary", key = "'active-only'")
-    public List<ProductSummaryResponseDTO> getActiveProductsSummary() {
-        log.info("Retrieving ACTIVE products summary only");
-        List<Product> products = productRepository.findAllByActiveOrderByCreatedAtDesc(true);
-        return productMapper.toSummaryDTOList(products);
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "productSummary", key = "'inactive-only'")
-    public List<ProductSummaryResponseDTO> getInactiveProductsSummary() {
-        log.info("Retrieving INACTIVE products summary only");
-        List<Product> products = productRepository.findAllByActiveOrderByCreatedAtDesc(false);
-        return productMapper.toSummaryDTOList(products);
-    }
-
     @Override
     @Transactional(readOnly = true)
     public List<ProductSummaryResponseDTO> getProductsBySubcategorySummary(Long subcategoryId) {
@@ -371,7 +355,7 @@ public class ProductServiceImpl implements ProductService {
     public PagedProductResponseDTO getProductsPaged(
             String name, String sku, String supplierSku,
             BigDecimal minPrice, BigDecimal maxPrice,
-            Long subcategoryId, Long categoryId, // <-- Recibimos el parámetro
+            Long subcategoryId, Long categoryId,
             Long supplierId, Boolean active, Integer minStock, Integer maxStock,
             Pageable pageable) {
 
@@ -396,25 +380,21 @@ public class ProductServiceImpl implements ProductService {
             stockMax = maxStock;
         }
 
-        // 1. Obtenemos la página específica usando tanto subcategoryId como categoryId
         Page<Product> productPage = productRepository.findProductsWithFilters(
                 searchName, searchSku, searchSupplierSku, minPrice, maxPrice,
                 subcategoryId, categoryId, supplierId, active, stockMin, stockMax, pageable);
 
-        // 2. Obtenemos todo el universo sin paginar para calcular las estadísticas globales bajo el mismo filtro
         Page<Product> allFilteredPage = productRepository.findProductsWithFilters(
                 searchName, searchSku, searchSupplierSku, minPrice, maxPrice,
                 subcategoryId, categoryId, supplierId, active, stockMin, stockMax, Pageable.unpaged());
 
         List<Product> allFilteredProducts = allFilteredPage.getContent();
 
-        // 3. Métricas en memoria sobre el universo total afectado
         long activeCount = allFilteredProducts.stream().filter(Product::getActive).count();
         long inactiveCount = allFilteredProducts.stream().filter(p -> !p.getActive()).count();
         long lowStockCount = allFilteredProducts.stream().filter(p -> p.getCurrentStock() < 10 && p.getCurrentStock() > 0).count();
         long outOfStockCount = allFilteredProducts.stream().filter(p -> p.getCurrentStock() == 0).count();
 
-        // 4. Mapeo a DTO list
         List<ProductSummaryResponseDTO> contentDTOs = productMapper.toSummaryDTOList(productPage.getContent());
 
         return PagedProductResponseDTO.builder()
@@ -433,7 +413,6 @@ public class ProductServiceImpl implements ProductService {
                 .build();
     }
 
-
     @Override
     @Transactional(readOnly = true)
     public Page<ProductSummaryResponseDTO> searchProductsGeneral(
@@ -442,31 +421,20 @@ public class ProductServiceImpl implements ProductService {
 
         log.info("🔍 Búsqueda general - query: '{}', categoryId: {}", query, categoryId);
 
-        // ✅ Buscar en ambos campos simultáneamente
         String searchTerm = null;
-
         if (query != null && !query.trim().isEmpty()) {
             searchTerm = query.trim();
         }
 
         Page<Product> productPage = productRepository.findProductsWithFilters(
-                searchTerm,  // name
-                searchTerm,  // sku - buscar en ambos
-                null,        // supplierSku
-                minPrice, maxPrice,
-                null,        // subcategoryId
-                categoryId,  // categoryId
-                supplierId,
-                active,
-                null,        // minStock
-                null,        // maxStock
-                pageable);
+                searchTerm, searchTerm, null, minPrice, maxPrice,
+                null, categoryId, supplierId, active, null, null, pageable);
 
-        log.info("✅ Resultados encontrados para '{}': {}", query, productPage.getTotalElements());
-        return productPage.map(productMapper::toSummaryDTO);
+        // ✅ CORREGIDO: Usar toSummaryDTOWithImage en lugar de toSummaryDTO
+        return productPage.map(product -> productMapper.toSummaryDTO(product));
     }
 
-    // ========== GESTIÓN DE STOCK CON REGISTRO DE MOVIMIENTOS ==========
+    // ========== GESTIÓN DE STOCK ==========
 
     @Override
     @Transactional
@@ -547,16 +515,6 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Long getTotalProductCount() {
         return productRepository.countAllProducts();
-    }
-
-    @Transactional(readOnly = true)
-    public Long getInactiveProductCount() {
-        return productRepository.countAllProducts() - productRepository.countActiveProducts();
-    }
-
-    @Transactional(readOnly = true)
-    public Long getActiveProductCount() {
-        return productRepository.countActiveProducts();
     }
 
     @Override
