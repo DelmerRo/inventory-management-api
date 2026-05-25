@@ -26,15 +26,20 @@ public class MultimediaFile {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @Column(name = "file_name")
     private String fileName;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "file_type")
     private FileType fileType;
 
+    @Column(name = "cloudinary_public_id", length = 150)
     private String cloudinaryPublicId;
 
+    @Column(name = "file_url", length = 500)
     private String fileUrl;
 
+    @Column(name = "file_format", length = 20)
     private String fileFormat;
 
     @CreationTimestamp
