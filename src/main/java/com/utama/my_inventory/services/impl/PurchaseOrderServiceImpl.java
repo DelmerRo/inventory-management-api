@@ -500,7 +500,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         // 🌟 MEJORA: Persistir Costo Actualizado y calcular Precio de Venta (Costo x 2)
         product.setCostPrice(unitPrice);
         product.setSalePrice(unitPrice.multiply(BigDecimal.valueOf(2)));
-        productRepository.save(product); // Guardamos la actualización de precios en el catálogo
+        productRepository.save(product);
         log.info("💰 Precios actualizados para {}: Costo = ${}, Venta (x2) = ${}",
                 product.getName(), unitPrice, product.getSalePrice());
 
