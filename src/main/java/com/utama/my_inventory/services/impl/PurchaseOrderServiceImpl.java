@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -285,13 +286,19 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     private PurchaseOrder buildPurchaseOrder(String orderNumber, Supplier supplier, PurchaseOrderRequestDTO dto) {
+        String initialNotes = dto.getNotes();
+        if (initialNotes != null && !initialNotes.trim().isEmpty()) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            initialNotes = String.format("[%s] %s", LocalDateTime.now().format(formatter), initialNotes.trim());
+        }
+
         return PurchaseOrder.builder()
                 .orderNumber(orderNumber)
                 .supplier(supplier)
                 .orderDate(dto.getOrderDate() != null ? dto.getOrderDate() : LocalDateTime.now())
                 .expectedDeliveryDate(dto.getExpectedDeliveryDate())
                 .status("PENDIENTE")
-                .notes(dto.getNotes())
+                .notes(initialNotes)
                 .items(new ArrayList<>())
                 .build();
     }
@@ -385,13 +392,22 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     private void updateOrderNotes(PurchaseOrder order, String newNotes) {
-        if (newNotes != null && !newNotes.trim().isEmpty()) {
-            String currentNotes = order.getNotes();
-            order.setNotes(currentNotes != null && !currentNotes.trim().isEmpty()
-                    ? currentNotes + " | " + newNotes
-                    : newNotes);
-            log.info("Notas actualizadas del pedido: {}", order.getNotes());
+        if (newNotes == null || newNotes.trim().isEmpty()) {
+            return;
         }
+
+        String currentNotes = order.getNotes();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        String timestampedNote = String.format("[%s] %s", LocalDateTime.now().format(formatter), newNotes.trim());
+
+        if (currentNotes == null || currentNotes.trim().isEmpty()) {
+            order.setNotes(timestampedNote);
+        } else {
+            order.setNotes(currentNotes + "\n" + timestampedNote);
+        }
+
+        log.info("Historial de notas concatenado y actualizado: {}", order.getNotes());
     }
 
     // --- Contexto para procesamiento de recepción ---
@@ -477,11 +493,16 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private void processReceivedProduct(DeliveryReceiptContext ctx, PurchaseOrderItem orderedItem,
                                         Product product, int actualReceived, int newTotalReceived,
                                         int orderedQty, BigDecimal unitPrice) {
-        activateProductIfNeeded(product);
+
         registerInventoryMovement(product.getId(), actualReceived, unitPrice,
                 buildMovementReason(ctx.getOrder(), orderedItem));
 
-        updateProductStock(product, actualReceived);
+        // 🌟 MEJORA: Persistir Costo Actualizado y calcular Precio de Venta (Costo x 2)
+        product.setCostPrice(unitPrice);
+        product.setSalePrice(unitPrice.multiply(BigDecimal.valueOf(2)));
+        productRepository.save(product); // Guardamos la actualización de precios en el catálogo
+        log.info("💰 Precios actualizados para {}: Costo = ${}, Venta (x2) = ${}",
+                product.getName(), unitPrice, product.getSalePrice());
 
         if (newTotalReceived >= orderedQty) {
             ctx.getMatchedItems().add(buildMatchedItemDTO(orderedItem, product, actualReceived, unitPrice));
@@ -521,14 +542,17 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         Product product = createOrGetProductBySupplierSku(
                 supplierSku, receivedItem.getProductName(), ctx.getOrder().getSupplier().getId());
 
-        activateProductIfNeeded(product);
-
         BigDecimal unitPrice = receivedItem.getUnitPrice() != null ? receivedItem.getUnitPrice() : BigDecimal.ZERO;
 
         registerInventoryMovement(product.getId(), receivedItem.getAdditionalQuantity(), unitPrice,
                 "PRODUCTO EXTRA - Pedido: " + ctx.getOrder().getOrderNumber());
 
-        updateProductStock(product, receivedItem.getAdditionalQuantity());
+        // 🌟 MEJORA: Persistir Costo y calcular Precio de Venta (x2) también en ítems extras
+        product.setCostPrice(unitPrice);
+        product.setSalePrice(unitPrice.multiply(BigDecimal.valueOf(2)));
+        productRepository.save(product);
+        log.info("💰 Precios actualizados para Producto Extra {}: Costo = ${}, Venta = ${}",
+                product.getName(), unitPrice, product.getSalePrice());
 
         ctx.getExtraItems().add(buildExtraItemDTO(product, receivedItem.getAdditionalQuantity()));
         ctx.addToTotalReceivedQuantity(receivedItem.getAdditionalQuantity());
@@ -539,8 +563,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         ctx.getMovementRecords().add(new InventoryMovementRecord(
                 product.getId(), product.getName(), receivedItem.getAdditionalQuantity(), unitPrice, "ENTRADA_EXTRA"));
-
-        log.info("➕ Producto extra recibido: {} - Cantidad: {}", product.getName(), receivedItem.getAdditionalQuantity());
     }
 
     private void updateOrderStatus(PurchaseOrder order) {
