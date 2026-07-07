@@ -45,7 +45,7 @@ public class InventoryServiceImpl implements InventoryService {
         log.info("Registering inventory movement - Product ID: {}, Type: {}, Quantity: {}",
                 requestDTO.productId(), requestDTO.movementType(), requestDTO.quantity());
 
-        Product product = findActiveProductById(requestDTO.productId());
+        Product product = findProductById(requestDTO.productId());
         String user = resolveUser(requestDTO.registeredBy(), currentUser);
 
         validateMovement(requestDTO, product);
