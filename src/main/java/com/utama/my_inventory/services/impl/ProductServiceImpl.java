@@ -463,7 +463,7 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDTO removeStock(Long productId, int quantity, String reason, String user) {
         log.info("Removing {} units from product ID: {}, reason: {}", quantity, productId, reason);
 
-        Product product = findActiveProductById(productId);
+        Product product = findProductById(productId);
 
         if (quantity <= 0) {
             throw new BusinessException("Quantity must be greater than 0");
