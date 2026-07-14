@@ -1,0 +1,37 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keep-render-awake
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        run: |
+          URL="https://inventory-management-api-xbpp.onrender.com/actuator/health"
+          echo "🕐 $(date -u '+%Y-%m-%d %H:%M:%S UTC') - Pingeando $URL"
+
+          response=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            --max-time 90 \
+            --retry 3 \
+            --retry-delay 5 \
+            --retry-all-errors \
+            "$URL")
+
+          echo "📡 HTTP status: $response"
+          echo "📄 Body:"
+          cat /tmp/response.json 2>/dev/null || echo "(sin contenido)"
+
+          if [ "$response" -ne 200 ]; then
+            echo "⚠️ El endpoint no respondió 200 después de los reintentos"
+            exit 1
+          fi
+
+          echo "✅ Backend activo"
