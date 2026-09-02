@@ -10,6 +10,7 @@ import com.utama.my_inventory.exceptions.BusinessException;
 import com.utama.my_inventory.repositories.*;
 import com.utama.my_inventory.services.InventoryService;
 import com.utama.my_inventory.services.PurchaseOrderService;
+import com.utama.my_inventory.services.generators.OrderNumberGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final ProductRepository productRepository;
     private final ProductSupplierRepository productSupplierRepository;
     private final InventoryService inventoryService;
+    private final OrderNumberGenerator orderNumberGenerator;
 
     private static final String ORDER_PREFIX = "PO";
     private static final int SEQUENCE_LENGTH = 6;
@@ -45,7 +47,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     public PurchaseOrderResponseDTO createOrder(PurchaseOrderRequestDTO dto) {
         log.info("Creando nuevo pedido");
 
-        String orderNumber = generateOrderNumber();
+        String orderNumber = orderNumberGenerator.generateNextOrderNumber();
         Supplier supplier = findSupplierById(dto.getSupplierId());
 
         PurchaseOrder order = buildPurchaseOrder(orderNumber, supplier, dto);
@@ -248,21 +250,6 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         if (order.isCompleted()) {
             throw new IllegalStateException("El pedido ya está completado");
         }
-    }
-
-    // --- Creación y construcción ---
-
-    private String generateOrderNumber() {
-        int year = LocalDateTime.now().getYear();
-        String yearStr = String.valueOf(year);
-
-        Long lastSequence = purchaseOrderRepository.getLastSequenceByYearJPQL(yearStr);
-        long nextNumber = (lastSequence != null ? lastSequence : 0) + 1;
-
-        String orderNumber = String.format("%s-%s-%s", ORDER_PREFIX, yearStr,
-                String.format("%0" + SEQUENCE_LENGTH + "d", nextNumber));
-
-        return ensureUniqueOrderNumber(orderNumber, yearStr, nextNumber);
     }
 
     private String ensureUniqueOrderNumber(String orderNumber, String yearStr, long baseNumber) {

@@ -1,4 +1,3 @@
-// PurchaseOrderRepository.java
 package com.utama.my_inventory.repositories;
 
 import com.utama.my_inventory.entities.PurchaseOrder;
@@ -23,17 +22,14 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
 
     boolean existsByOrderNumber(String orderNumber);
 
-    // ✅ Método para PostgreSQL (usando SPLIT_PART)
-    @Query("SELECT MAX(CAST(SUBSTRING(p.orderNumber, LOCATE('-', p.orderNumber, 4) + 1) AS integer)) " +
-            "FROM PurchaseOrder p " +
-            "WHERE p.orderNumber LIKE CONCAT(:year, '-%')")
-    Long getLastSequenceByYearJPQL(@Param("year") String year);
-
-    // ✅ Método alternativo para encontrar el último número de pedido
-    @Query("SELECT p.orderNumber FROM PurchaseOrder p WHERE p.orderNumber LIKE CONCAT(:prefix, '%') ORDER BY p.id DESC")
-    List<String> findLastOrderNumbersByPrefix(@Param("prefix") String prefix, org.springframework.data.domain.Pageable pageable);
-
-    // ✅ Método para contar pedidos por año
-    @Query("SELECT COUNT(p) FROM PurchaseOrder p WHERE p.orderNumber LIKE CONCAT(:year, '-%')")
-    Long countOrdersByYear(@Param("year") String year);
+    /**
+     * Obtiene el valor numérico máximo de la secuencia para un año determinado.
+     * Ejemplo: Para "PO-2026-000009", extrae "000009" como INTEGER -> 9.
+     */
+    @SuppressWarnings("SqlNoDataSourceInspection")
+    @Query(value = "SELECT COALESCE(MAX(CAST(SPLIT_PART(po.order_number, '-', 3) AS INTEGER)), 0) " +
+            "FROM purchase_orders po " +
+            "WHERE po.order_number LIKE CONCAT('PO-', :year, '-%')",
+            nativeQuery = true)
+    Long getLastSequenceByYear(@Param("year") String year);
 }
