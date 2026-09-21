@@ -359,11 +359,11 @@ public class ProductServiceImpl implements ProductService {
             Long supplierId, Boolean active, Integer minStock, Integer maxStock,
             Pageable pageable) {
 
-        log.info("🔍 Búsqueda - name: '{}', categoryId: {}, subcategoryId: {}", name, categoryId, subcategoryId);
+        // ✅ Limpieza y normalización sin variables redundantes
+        String searchName = (name != null && !name.trim().isEmpty() && !name.equalsIgnoreCase("null")) ? name.trim() : null;
+        String searchSupplierSku = (supplierSku != null && !supplierSku.trim().isEmpty() && !supplierSku.equalsIgnoreCase("null")) ? supplierSku.trim() : null;
 
-        String searchName = (name != null && !name.trim().isEmpty()) ? name.trim() : null;
-        String searchSku = searchName;
-        String searchSupplierSku = (supplierSku != null && !supplierSku.trim().isEmpty()) ? supplierSku.trim() : null;
+        log.info("🔍 Búsqueda - name: '{}', categoryId: {}, subcategoryId: {}", searchName, categoryId, subcategoryId);
 
         // Conversión de filtros de stock
         Integer stockMin = null;
@@ -381,11 +381,11 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Page<Product> productPage = productRepository.findProductsWithFilters(
-                searchName, searchSku, searchSupplierSku, minPrice, maxPrice,
+                searchName, searchName, searchSupplierSku, minPrice, maxPrice,
                 subcategoryId, categoryId, supplierId, active, stockMin, stockMax, pageable);
 
         Page<Product> allFilteredPage = productRepository.findProductsWithFilters(
-                searchName, searchSku, searchSupplierSku, minPrice, maxPrice,
+                searchName, searchName, searchSupplierSku, minPrice, maxPrice,
                 subcategoryId, categoryId, supplierId, active, stockMin, stockMax, Pageable.unpaged());
 
         List<Product> allFilteredProducts = allFilteredPage.getContent();
