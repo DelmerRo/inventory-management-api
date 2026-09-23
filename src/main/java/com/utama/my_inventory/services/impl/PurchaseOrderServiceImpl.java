@@ -6,6 +6,7 @@ import com.utama.my_inventory.dtos.response.OrderReconciliationDTO;
 import com.utama.my_inventory.dtos.response.PurchaseOrderItemResponseDTO;
 import com.utama.my_inventory.dtos.response.PurchaseOrderResponseDTO;
 import com.utama.my_inventory.entities.*;
+import com.utama.my_inventory.entities.enums.OrderStatus;
 import com.utama.my_inventory.exceptions.BusinessException;
 import com.utama.my_inventory.repositories.*;
 import com.utama.my_inventory.services.InventoryService;
@@ -161,6 +162,35 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         logOrderSummary(context);
 
         return buildReconciliationResponse(context);
+    }
+
+    @Override
+    @Transactional
+    public PurchaseOrderResponseDTO forceCloseOrder(Long orderId, String reason) {
+        log.info("Forzando cierre del pedido ID: {}. Motivo: {}", orderId, reason);
+
+        PurchaseOrder order = findOrderById(orderId);
+
+        String currentStatus = order.getStatus();
+        if (OrderStatus.COMPLETADO.name().equals(currentStatus) || OrderStatus.CANCELADO.name().equals(currentStatus)) {
+            throw new BusinessException("No se puede forzar el cierre de un pedido que ya está " + currentStatus);
+        }
+
+        // 1. Agregar la razón usando tu helper interno (que ya formatea la fecha)
+        String closingNote = "CIERRE FORZADO: " + (reason != null && !reason.isBlank() ? reason : "Sin motivo especificado");
+        updateOrderNotes(order, closingNote);
+
+        // 2. Cambiar estado usando tu Enum
+        order.setStatus(OrderStatus.COMPLETADO.name());
+
+        // 3. Registrar fecha de cierre
+        order.setDeliveryDate(LocalDateTime.now());
+
+        PurchaseOrder savedOrder = purchaseOrderRepository.save(order);
+        log.info("Pedido {} forzado a estado COMPLETADO.", savedOrder.getOrderNumber());
+
+        // 4. Retornar usando tu método manual, sin MapStruct
+        return convertToResponseDTO(savedOrder);
     }
 
     @Override

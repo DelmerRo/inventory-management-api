@@ -27,6 +27,7 @@ public interface PurchaseOrderService {
     OrderReconciliationDTO processDeliveryReceipt(DeliveryReceiptDTO receiptDTO);
     OrderReconciliationDTO reconcileOrder(Long orderId);
     PurchaseOrderResponseDTO confirmOrderCompletion(Long orderId);
+    PurchaseOrderResponseDTO forceCloseOrder(Long orderId, String reason);
 
     // Consultas específicas
     List<PurchaseOrderResponseDTO> getOrdersBySupplier(Long supplierId);

@@ -573,4 +573,18 @@ public class PurchaseOrderController {
         return ExtendedBaseResponse.ok(orders, "Pedidos pendientes obtenidos")
                 .toResponseEntity();
     }
+
+    @Operation(
+            summary = "🔒 Forzar Cierre de Pedido",
+            description = "Marca un pedido incompleto (PARCIAL o PENDIENTE) como COMPLETADO de manera forzada. Deja registro en las notas."
+    )
+    @PatchMapping("/{orderId}/force-close")
+    public ResponseEntity<ExtendedBaseResponse<PurchaseOrderResponseDTO>> forceCloseOrder(
+            @PathVariable Long orderId,
+            @RequestParam String reason) {
+
+        PurchaseOrderResponseDTO closedOrder = purchaseOrderService.forceCloseOrder(orderId, reason);
+        return ExtendedBaseResponse.ok(closedOrder, "Pedido cerrado forzadamente con éxito")
+                .toResponseEntity();
+    }
 }
