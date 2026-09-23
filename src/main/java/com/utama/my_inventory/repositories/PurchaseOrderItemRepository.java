@@ -21,6 +21,11 @@ public interface PurchaseOrderItemRepository extends JpaRepository<PurchaseOrder
             "WHERE poi.purchaseOrder.id = :orderId AND poi.quantityReceived < poi.quantity")
     List<PurchaseOrderItem> findPendingItemsByOrderId(@Param("orderId") Long orderId);
 
+    // Desvincular el producto de la orden de compra antes de eliminarlo
+    @Modifying
+    @Query("UPDATE PurchaseOrderItem poi SET poi.product = null WHERE poi.product.id = :productId")
+    void unlinkProduct(@Param("productId") Long productId);
+
     // Actualizar cantidad recibida
     @Modifying
     @Transactional

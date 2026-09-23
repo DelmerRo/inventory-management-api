@@ -26,6 +26,7 @@ public interface ProductService {
     ProductResponseDTO updateProduct(Long id, ProductRequestDTO requestDTO);
     void deleteProduct(Long id);
     ProductResponseDTO toggleProductStatus(Long id);
+    void hardDeleteProduct(Long id);
 
     // ========== PAGINACIÓN CON FILTROS (VERSIÓN COMPLETA) ==========
     // Modificar esta firma en ProductService.java
