@@ -14,11 +14,9 @@ import com.utama.my_inventory.entities.*;
 import com.utama.my_inventory.exceptions.BusinessException;
 import com.utama.my_inventory.exceptions.ResourceNotFoundException;
 import com.utama.my_inventory.mapper.ProductMapper;
-import com.utama.my_inventory.repositories.ProductRepository;
-import com.utama.my_inventory.repositories.ProductSupplierRepository;
-import com.utama.my_inventory.repositories.SubcategoryRepository;
-import com.utama.my_inventory.repositories.SupplierRepository;
+import com.utama.my_inventory.repositories.*;
 import com.utama.my_inventory.services.InventoryService;
+import com.utama.my_inventory.services.MultimediaService;
 import com.utama.my_inventory.services.ProductService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +43,8 @@ public class ProductServiceImpl implements ProductService {
     private final SupplierRepository supplierRepository;
     private final ProductSupplierRepository productSupplierRepository;
     private final InventoryService inventoryService;
+    private final PurchaseOrderItemRepository purchaseOrderItemRepository;
+    private final MultimediaService multimediaService;
 
     // ========== CRUD BÁSICO ==========
 
@@ -671,6 +671,31 @@ public class ProductServiceImpl implements ProductService {
         Product product = findActiveProductById(productId);
         log.info("Supplier SKU updated successfully");
         return productMapper.toResponseDTO(product);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"products", "productSummary", "productDetails"}, allEntries = true)
+    public void hardDeleteProduct(Long id) {
+        log.info("Iniciando borrado FÍSICO (Hard Delete) del producto ID: {}", id);
+
+        // 1. Buscar producto (independiente de si está activo o inactivo)
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con ID: " + id));
+
+        // 2. Limpiar imágenes físicas en Cloudinary para no dejar archivos huérfanos
+        if (product.getMultimediaFiles() != null && !product.getMultimediaFiles().isEmpty()) {
+            multimediaService.deletePhysicalFiles(product.getMultimediaFiles());
+        }
+
+        // 3. Desvincular de Órdenes de Compra (Mantiene la integridad contable e histórica)
+        purchaseOrderItemRepository.unlinkProduct(id);
+
+        // 4. Hibernate elimina el registro de Product.
+        // Por cascada, eliminará automáticamente InventoryMovement, ProductSupplier y MultimediaFile.
+        productRepository.delete(product);
+
+        log.info("Producto ID: {} eliminado FÍSICAMENTE de forma exitosa.", id);
     }
 
     // ========== MÉTODOS PRIVADOS ==========

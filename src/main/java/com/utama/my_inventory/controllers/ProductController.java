@@ -172,6 +172,20 @@ public class ProductController {
         return ExtendedBaseResponse.<Void>ok(null, "Producto eliminado exitosamente").toResponseEntity();
     }
 
+    @DeleteMapping("/{id}/hard")
+    @Operation(summary = "Eliminar producto físicamente (Hard Delete)",
+            description = "Elimina el producto de la BD, desvincula órdenes de compra y borra imágenes en la nube.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Producto eliminado definitivamente"),
+            @ApiResponse(responseCode = "404", description = "Producto no encontrado"),
+            @ApiResponse(responseCode = "500", description = "Error de integridad referencial")
+    })
+    public ResponseEntity<ExtendedBaseResponse<Void>> hardDeleteProduct(@PathVariable Long id) {
+        productService.hardDeleteProduct(id);
+        return ExtendedBaseResponse.<Void>ok(null, "Producto eliminado definitivamente del sistema")
+                .toResponseEntity();
+    }
+
     @PatchMapping("/{id}/toggle-status")
     public ResponseEntity<ExtendedBaseResponse<ProductResponseDTO>> toggleProductStatus(@PathVariable Long id) {
         ProductResponseDTO product = productService.toggleProductStatus(id);

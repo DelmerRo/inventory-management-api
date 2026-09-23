@@ -81,4 +81,22 @@ public class MultimediaServiceImpl implements MultimediaService {
                 ))
                 .toList();
     }
+
+    @Override
+    public void deletePhysicalFiles(List<MultimediaFile> files) {
+        if (files == null || files.isEmpty()) return;
+
+        for (MultimediaFile file : files) {
+            if (file.getCloudinaryPublicId() != null) {
+                try {
+                    cloudinaryService.deleteFile(file.getCloudinaryPublicId());
+                    log.info("Archivo físico eliminado de Cloudinary: {}", file.getCloudinaryPublicId());
+                } catch (Exception e) {
+                    log.error("Fallo al eliminar archivo en Cloudinary (Public ID: {}). Error: {}",
+                            file.getCloudinaryPublicId(), e.getMessage());
+                    // No lanzamos excepción para permitir que el borrado de la BD continúe
+                }
+            }
+        }
+    }
 }
