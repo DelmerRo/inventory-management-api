@@ -233,8 +233,8 @@ public class ProductController {
         return ExtendedBaseResponse.ok(products, "Búsqueda completada").toResponseEntity();
     }
 
-    @GetMapping("/by-supplier-sku/{supplierSku}")
-    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplierSku(@PathVariable String supplierSku) {
+    @GetMapping("/by-supplier-sku")
+    public ResponseEntity<ExtendedBaseResponse<List<ProductSummaryResponseDTO>>> getProductsBySupplierSku(@RequestParam String supplierSku) {
         return ExtendedBaseResponse.ok(productService.findByProductSupplierSku(supplierSku), "Productos encontrados por SKU de proveedor")
                 .toResponseEntity();
     }
