@@ -1,6 +1,7 @@
 package com.utama.my_inventory.repositories;
 
 import com.utama.my_inventory.entities.InventoryMovement;
+import com.utama.my_inventory.entities.Product;
 import com.utama.my_inventory.entities.enums.MovementType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface InventoryMovementRepository extends JpaRepository<InventoryMovement, Long> , JpaSpecificationExecutor<InventoryMovement> {
@@ -34,4 +36,11 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
     Long countMovementsByProduct(@Param("productId") Long productId);
 
     List<InventoryMovement> findByRegisteredByOrderByMovementDateDesc(String username);
+
+    // Obtiene las últimas compras de un producto para promediar su CPP
+    List<InventoryMovement> findTop10ByProductAndMovementTypeOrderByMovementDateDesc(Product product, MovementType type);
+
+    // Suma todas las cantidades vendidas desde una fecha dada (Predicción de ventas)
+    @Query("SELECT SUM(m.quantity) FROM InventoryMovement m WHERE m.movementType = 'SALIDA' AND m.movementDate >= :startDate")
+    Optional<Integer> sumQuantityByOutcomesSince(@Param("startDate") LocalDateTime startDate);
 }
