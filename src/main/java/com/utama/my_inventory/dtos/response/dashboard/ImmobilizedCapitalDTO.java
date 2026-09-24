@@ -1,4 +1,4 @@
-package com.utama.my_inventory.dtos.request.dashboard;
+package com.utama.my_inventory.dtos.response.dashboard;
 
 import java.math.BigDecimal;
 

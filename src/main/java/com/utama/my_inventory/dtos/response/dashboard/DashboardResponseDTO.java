@@ -1,4 +1,7 @@
 package com.utama.my_inventory.dtos.response.dashboard;
 
-public record DashboardResponseDTO() {
-}
+public record DashboardResponseDTO(
+        ImmobilizedCapitalDTO capital,
+        ProfitabilityDTO profitability,
+        PredictionDTO predictions
+) {}

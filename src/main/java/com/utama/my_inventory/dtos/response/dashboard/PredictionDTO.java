@@ -1,4 +1,4 @@
-package com.utama.my_inventory.dtos.request.dashboard;
+package com.utama.my_inventory.dtos.response.dashboard;
 
 public record PredictionDTO(
         int salesLast30Days,
