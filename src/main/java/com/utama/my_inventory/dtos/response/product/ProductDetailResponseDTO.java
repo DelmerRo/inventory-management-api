@@ -37,6 +37,15 @@ public record ProductDetailResponseDTO(
         @Schema(description = "Stock actual", example = "10")
         Integer currentStock,
 
+        @Schema(description = "Costo del empaque calculado paramétricamente", example = "450.50")
+        BigDecimal packagingCost,
+
+        @Schema(description = "Costo Real de Producto Terminado (Costo Base + Empaque)", example = "1650.50")
+        BigDecimal finalTerminatedCost,
+
+        @Schema(description = "Desglose de los insumos consumidos para empaquetar este producto")
+        List<PackagingBreakdownDTO> packagingBreakdown,
+
         @Schema(description = "Margen de ganancia")
         BigDecimal margin,
 

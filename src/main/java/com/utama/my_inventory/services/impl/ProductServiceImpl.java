@@ -18,6 +18,7 @@ import com.utama.my_inventory.repositories.*;
 import com.utama.my_inventory.services.InventoryService;
 import com.utama.my_inventory.services.MultimediaService;
 import com.utama.my_inventory.services.ProductService;
+import com.utama.my_inventory.services.api.PackagingCostService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class ProductServiceImpl implements ProductService {
     private final InventoryService inventoryService;
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final MultimediaService multimediaService;
+    private final PackagingCostService packagingCostService;
 
     // ========== CRUD BÁSICO ==========
 
@@ -568,9 +570,23 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     @Cacheable(value = "productDetails", key = "#id")
     public ProductDetailResponseDTO getProductDetailById(Long id) {
-        log.info("Retrieving product detail for ID: {} (including inactive)", id);
+        log.info("Retrieving product detail for ID: {} (including cost breakdown)", id);
         Product product = findProductById(id);
-        return productMapper.toDetailDTO(product);
+
+        // 1. Delegamos la matemática al motor de costeo paramétrico
+        PackagingCostService.PackagingCostResult packaging = packagingCostService.calculatePackagingCost(product);
+
+        // 2. Sumamos el Costo Base + Costo Empaque
+        BigDecimal baseCost = product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO;
+        BigDecimal finalTerminatedCost = baseCost.add(packaging.totalCost());
+
+        // 3. Pasamos todo al Mapper
+        return productMapper.toDetailDTO(
+                product,
+                packaging.totalCost(),
+                finalTerminatedCost,
+                packaging.breakdown()
+        );
     }
 
     @Override
@@ -578,7 +594,19 @@ public class ProductServiceImpl implements ProductService {
     public ProductDetailResponseDTO getProductDetailBySku(String sku) {
         Product product = productRepository.findBySkuAndActiveTrue(sku)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with SKU: " + sku));
-        return productMapper.toDetailDTO(product);
+
+        // Misma lógica para cuando lo buscas por SKU
+        PackagingCostService.PackagingCostResult packaging = packagingCostService.calculatePackagingCost(product);
+
+        BigDecimal baseCost = product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO;
+        BigDecimal finalTerminatedCost = baseCost.add(packaging.totalCost());
+
+        return productMapper.toDetailDTO(
+                product,
+                packaging.totalCost(),
+                finalTerminatedCost,
+                packaging.breakdown()
+        );
     }
 
     // ========== MÉTODOS PARA MÚLTIPLES PROVEEDORES ==========
