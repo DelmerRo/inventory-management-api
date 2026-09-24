@@ -1,13 +1,16 @@
+// com/utama/my_inventory/services/impl/DashboardServiceImpl.java
 package com.utama.my_inventory.services.impl;
 
 import com.utama.my_inventory.dtos.response.dashboard.*;
 import com.utama.my_inventory.entities.Product;
 import com.utama.my_inventory.entities.Supply;
+import com.utama.my_inventory.exceptions.BusinessException;
 import com.utama.my_inventory.repositories.InventoryMovementRepository;
 import com.utama.my_inventory.repositories.ProductRepository;
 import com.utama.my_inventory.repositories.SupplyRepository;
-import com.utama.my_inventory.services.api.CostCalculationService;
-import com.utama.my_inventory.services.api.ExchangeRateService;
+import com.utama.my_inventory.services.CostCalculationService;
+import com.utama.my_inventory.services.ExchangeRateService;
+import com.utama.my_inventory.services.PackagingCostService; // ✅ Usamos la nueva interfaz
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,84 +34,92 @@ public class DashboardServiceImpl {
     private final InventoryMovementRepository movementRepository;
     private final CostCalculationService costCalculationService;
     private final ExchangeRateService exchangeRateService;
+    private final PackagingCostService packagingCostService;
 
     public DashboardResponseDTO getConsolidatedDashboard(BigDecimal expectedMarginPercentage) {
-        log.info("Generando métricas consolidadas del Dashboard...");
+        log.info("Generando métricas consolidadas del Dashboard (Modo Batch)...");
 
-        LocalDate today = LocalDate.now();
-        BigDecimal currentUsdRate = exchangeRateService.getUsdRateForDate(today);
+        try {
+            LocalDate today = LocalDate.now();
+            BigDecimal currentUsdRate = exchangeRateService.getUsdRateForDate(today);
 
-        // 1. CAPITAL EN INSUMOS
-        List<Supply> activeSupplies = supplyRepository.findByActiveTrueOrderByNameAsc();
-        BigDecimal totalSuppliesArs = activeSupplies.stream()
-                .filter(s -> s.getCurrentStock() > 0)
-                .map(s -> s.getUnitCost().multiply(BigDecimal.valueOf(s.getCurrentStock())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // 1. CAPITAL EN INSUMOS
+            List<Supply> activeSupplies = supplyRepository.findByActiveTrueOrderByNameAsc();
+            BigDecimal totalSuppliesArs = activeSupplies.stream()
+                    .filter(s -> s.getCurrentStock() > 0)
+                    .map(s -> s.getUnitCost().multiply(BigDecimal.valueOf(s.getCurrentStock())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Buscar tarifa de empaque (Busca dinámicamente un insumo tipo cartón/caja/burbuja)
-        BigDecimal packagingMaterialCost = activeSupplies.stream()
-                .filter(s -> s.getName().toLowerCase().matches(".*(carton|caja|burbuja|empaque).*"))
-                .findFirst()
-                .map(Supply::getUnitCost)
-                .orElse(new BigDecimal("0.05")); // Costo por defecto si no lo tienes cargado aún
+            // 2. OBTENER PRODUCTOS
+            List<Product> activeProducts = productRepository.findByActiveTrueOrderByNameAsc();
+            List<Long> productIds = activeProducts.stream().map(Product::getId).toList();
 
-        // 2. CAPITAL EN PRODUCTOS Y RENTABILIDAD
-        // ✅ SOLUCIÓN AQUÍ: Usamos el método exacto que existe en tu ProductRepository
-        List<Product> activeProducts = productRepository.findByActiveTrueOrderByNameAsc();
+            // ==========================================
+            // 🔥 LA MAGIA DEL BATCH FETCHING 🔥
+            // Hacemos 2 consultas grandes en vez de miles pequeñas
+            // ==========================================
+            Map<Long, BigDecimal> cppMap = costCalculationService.calculateCPPBatch(productIds);
+            Map<Long, PackagingCostService.PackagingCostResult> packagingMap = packagingCostService.calculatePackagingCostBatch(activeProducts);
 
-        BigDecimal totalProductsArs = BigDecimal.ZERO;
-        BigDecimal totalExpectedRevenue = BigDecimal.ZERO;
-        BigDecimal sumCpps = BigDecimal.ZERO;
-        BigDecimal sumPackagingCosts = BigDecimal.ZERO;
-        int productsWithStockCount = 0;
+            BigDecimal totalProductsArs = BigDecimal.ZERO;
+            BigDecimal totalExpectedRevenue = BigDecimal.ZERO;
+            BigDecimal sumCpps = BigDecimal.ZERO;
+            BigDecimal sumPackagingCosts = BigDecimal.ZERO;
+            int productsWithStockCount = 0;
 
-        for (Product p : activeProducts) {
-            int stock = p.getCurrentStock();
-            if (stock > 0) {
-                BigDecimal cpp = costCalculationService.calculateCPP(p);
-                BigDecimal packagingCost = costCalculationService.calculatePackagingCost(p, packagingMaterialCost);
-                BigDecimal totalUnitCost = cpp.add(packagingCost);
+            // 3. RECORRER PRODUCTOS (Cero consultas SQL aquí dentro)
+            for (Product p : activeProducts) {
+                int stock = p.getCurrentStock();
+                if (stock > 0) {
+                    // Leer de los Mapas en RAM (Tiempo de respuesta: ~0.001 ms)
+                    BigDecimal cpp = cppMap.getOrDefault(p.getId(), p.getCostPrice() != null ? p.getCostPrice() : BigDecimal.ZERO);
+                    PackagingCostService.PackagingCostResult packaging = packagingMap.get(p.getId());
+                    BigDecimal packagingCost = packaging != null ? packaging.totalCost() : BigDecimal.ZERO;
 
-                totalProductsArs = totalProductsArs.add(cpp.multiply(BigDecimal.valueOf(stock)));
+                    BigDecimal totalUnitCost = cpp.add(packagingCost);
+                    totalProductsArs = totalProductsArs.add(cpp.multiply(BigDecimal.valueOf(stock)));
 
-                // Calculo de Ganancia Proyectada: Costo Total * (1 + Margen Promedio)
-                BigDecimal multiplier = BigDecimal.ONE.add(expectedMarginPercentage.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-                BigDecimal expectedSalePrice = totalUnitCost.multiply(multiplier);
-                totalExpectedRevenue = totalExpectedRevenue.add(expectedSalePrice.multiply(BigDecimal.valueOf(stock)));
+                    BigDecimal multiplier = BigDecimal.ONE.add(expectedMarginPercentage.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+                    BigDecimal expectedSalePrice = totalUnitCost.multiply(multiplier);
+                    totalExpectedRevenue = totalExpectedRevenue.add(expectedSalePrice.multiply(BigDecimal.valueOf(stock)));
 
-                sumCpps = sumCpps.add(cpp);
-                sumPackagingCosts = sumPackagingCosts.add(packagingCost);
-                productsWithStockCount++;
+                    sumCpps = sumCpps.add(cpp);
+                    sumPackagingCosts = sumPackagingCosts.add(packagingCost);
+                    productsWithStockCount++;
+                }
             }
+
+            BigDecimal totalCombinedArs = totalProductsArs.add(totalSuppliesArs);
+            BigDecimal totalCombinedUsd = exchangeRateService.convertToUsd(totalCombinedArs, today);
+
+            // 4. PREDICCIONES
+            LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+            int salesLast30Days = movementRepository.sumQuantityByOutcomesSince(thirtyDaysAgo).orElse(0);
+            int totalCurrentProductStock = activeProducts.stream().mapToInt(Product::getCurrentStock).sum();
+
+            int estimatedStockOutDays = salesLast30Days > 0
+                    ? (int) (totalCurrentProductStock / (salesLast30Days / 30.0))
+                    : 999;
+
+            // 5. RESPUESTA
+            ImmobilizedCapitalDTO capitalDTO = new ImmobilizedCapitalDTO(
+                    totalProductsArs, totalSuppliesArs, totalCombinedArs, totalCombinedUsd, currentUsdRate);
+
+            ProfitabilityDTO profitabilityDTO = new ProfitabilityDTO(
+                    productsWithStockCount > 0 ? sumCpps.divide(BigDecimal.valueOf(productsWithStockCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO,
+                    productsWithStockCount > 0 ? sumPackagingCosts.divide(BigDecimal.valueOf(productsWithStockCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO,
+                    totalExpectedRevenue,
+                    totalExpectedRevenue.subtract(totalProductsArs).subtract(totalSuppliesArs)
+            );
+
+            PredictionDTO predictionDTO = new PredictionDTO(
+                    salesLast30Days, estimatedStockOutDays, estimatedStockOutDays < 15);
+
+            return new DashboardResponseDTO(capitalDTO, profitabilityDTO, predictionDTO);
+
+        } catch (Exception e) {
+            log.error("Fallo crítico en la generación del Dashboard: {}", e.getMessage(), e);
+            throw new BusinessException("No fue posible generar el Dashboard. Contacte a soporte.");
         }
-
-        BigDecimal totalCombinedArs = totalProductsArs.add(totalSuppliesArs);
-        BigDecimal totalCombinedUsd = exchangeRateService.convertToUsd(totalCombinedArs, today);
-
-        // 3. PREDICCIONES LINEALES
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
-        int salesLast30Days = movementRepository.sumQuantityByOutcomesSince(thirtyDaysAgo).orElse(0);
-        int totalCurrentProductStock = activeProducts.stream().mapToInt(Product::getCurrentStock).sum();
-
-        // Días de stock = (Stock actual / (Ventas mensuales / 30 días))
-        int estimatedStockOutDays = salesLast30Days > 0
-                ? (int) (totalCurrentProductStock / (salesLast30Days / 30.0))
-                : 999;
-
-        // 4. CONSTRUCCIÓN DE RESPUESTA
-        ImmobilizedCapitalDTO capitalDTO = new ImmobilizedCapitalDTO(
-                totalProductsArs, totalSuppliesArs, totalCombinedArs, totalCombinedUsd, currentUsdRate);
-
-        ProfitabilityDTO profitabilityDTO = new ProfitabilityDTO(
-                productsWithStockCount > 0 ? sumCpps.divide(BigDecimal.valueOf(productsWithStockCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO,
-                productsWithStockCount > 0 ? sumPackagingCosts.divide(BigDecimal.valueOf(productsWithStockCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO,
-                totalExpectedRevenue,
-                totalExpectedRevenue.subtract(totalProductsArs).subtract(totalSuppliesArs) // Neto
-        );
-
-        PredictionDTO predictionDTO = new PredictionDTO(
-                salesLast30Days, estimatedStockOutDays, estimatedStockOutDays < 15);
-
-        return new DashboardResponseDTO(capitalDTO, profitabilityDTO, predictionDTO);
     }
 }

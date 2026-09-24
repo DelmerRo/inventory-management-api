@@ -16,4 +16,7 @@ public interface ProductPackagingRecipeRepository extends JpaRepository<ProductP
     // y evitar problemas de Lazy Loading al leer el CPP (Costo Unitario).
     @Query("SELECT r FROM ProductPackagingRecipe r JOIN FETCH r.supply WHERE r.product.id = :productId")
     List<ProductPackagingRecipe> findByProductIdWithSupplies(@Param("productId") Long productId);
+
+    @Query("SELECT r FROM ProductPackagingRecipe r JOIN FETCH r.supply WHERE r.product.id IN :productIds")
+    List<ProductPackagingRecipe> findByProductIdInWithSupplies(@Param("productIds") List<Long> productIds);
 }
