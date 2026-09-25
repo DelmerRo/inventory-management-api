@@ -43,4 +43,6 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
     // Suma todas las cantidades vendidas desde una fecha dada (Predicción de ventas)
     @Query("SELECT SUM(m.quantity) FROM InventoryMovement m WHERE m.movementType = 'SALIDA' AND m.movementDate >= :startDate")
     Optional<Integer> sumQuantityByOutcomesSince(@Param("startDate") LocalDateTime startDate);
+
+    List<InventoryMovement> findByProductIdInAndMovementTypeOrderByMovementDateDesc(List<Long> productIds, MovementType movementType);
 }

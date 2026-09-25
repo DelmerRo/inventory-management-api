@@ -1,6 +1,7 @@
 package com.utama.my_inventory.mapper;
 
 import com.utama.my_inventory.dtos.request.ProductRequestDTO;
+import com.utama.my_inventory.dtos.response.product.PackagingBreakdownDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductSummaryResponseDTO;
@@ -11,6 +12,7 @@ import com.utama.my_inventory.entities.ProductSupplier;
 import com.utama.my_inventory.entities.Subcategory;
 import org.mapstruct.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Mapper(
@@ -143,4 +145,21 @@ public interface ProductMapper {
     @Mapping(target = "sku", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntityFromDTO(ProductRequestDTO dto, @MappingTarget Product product);
+
+    // ========== PARA DETALLES ESENCIALES ==========
+    @Mapping(target = "margin", expression = "java(product.calculateMargin())")
+    @Mapping(target = "marginPercentage", expression = "java(product.calculateMarginPercentage())")
+    @Mapping(target = "volume", expression = "java(product.calculateVolume())")
+    @Mapping(target = "hasStock", expression = "java(product.hasStock())")
+    @Mapping(target = "lowStock", expression = "java(product.isLowStock(10))")
+    @Mapping(target = "subcategory", source = "product.subcategory", qualifiedByName = "toSubcategoryEssentialsDTO")
+    @Mapping(target = "suppliers", source = "product.productSuppliers", qualifiedByName = "mapProductSuppliers")
+    @Mapping(target = "primarySupplierName", expression = "java(product.getPrimarySupplier() != null ? product.getPrimarySupplier().getName() : null)")
+    @Mapping(target = "primarySupplierSku", expression = "java(product.getPrimarySupplierSku())")
+    @Mapping(target = "imageUrl", expression = "java(getFirstImageUrl(product))")
+    // NUEVOS MAPEOS DIRECTOS POR PARÁMETRO:
+    @Mapping(target = "packagingCost", source = "packagingCost")
+    @Mapping(target = "finalTerminatedCost", source = "finalTerminatedCost")
+    @Mapping(target = "packagingBreakdown", source = "breakdown")
+    ProductDetailResponseDTO toDetailDTO(Product product, BigDecimal packagingCost, BigDecimal finalTerminatedCost, List<PackagingBreakdownDTO> breakdown);
 }
