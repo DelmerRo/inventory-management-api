@@ -13,4 +13,6 @@ public interface PackagingCostService {
     record PackagingCostResult(BigDecimal totalCost, List<PackagingBreakdownDTO> breakdown) {}
 
     Map<Long, PackagingCostResult> calculatePackagingCostBatch(List<Product> products);
+
+    void updatePackagingRecipes(Long productId, List<com.utama.my_inventory.dtos.request.product.PackagingRecipeItemDTO> recipes);
 }

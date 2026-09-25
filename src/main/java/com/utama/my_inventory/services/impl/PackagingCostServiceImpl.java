@@ -1,15 +1,20 @@
 // com/utama/my_inventory/services/impl/PackagingCostServiceImpl.java
 package com.utama.my_inventory.services.impl;
 
+import com.utama.my_inventory.dtos.request.product.PackagingRecipeItemDTO;
 import com.utama.my_inventory.dtos.response.product.PackagingBreakdownDTO;
 import com.utama.my_inventory.entities.Product;
 import com.utama.my_inventory.entities.ProductPackagingRecipe;
 import com.utama.my_inventory.entities.Supply;
 import com.utama.my_inventory.exceptions.BusinessException;
+import com.utama.my_inventory.exceptions.ResourceNotFoundException;
 import com.utama.my_inventory.repositories.ProductPackagingRecipeRepository;
+import com.utama.my_inventory.repositories.ProductRepository;
+import com.utama.my_inventory.repositories.SupplyRepository;
 import com.utama.my_inventory.services.PackagingCostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +33,8 @@ import java.util.stream.Collectors;
 public class PackagingCostServiceImpl implements PackagingCostService {
 
     private final ProductPackagingRecipeRepository recipeRepository;
+    private final ProductRepository productRepository;
+    private final SupplyRepository supplyRepository;
 
     @Override
     public PackagingCostResult calculatePackagingCost(Product product) {
@@ -68,7 +75,9 @@ public class PackagingCostServiceImpl implements PackagingCostService {
                         supply.getUnitMeasure(),
                         quantityNeeded.setScale(4, RoundingMode.HALF_UP),
                         currentCpp,
-                        itemTotalCost
+                        itemTotalCost,
+                        recipe.getCalculationType(),
+                        recipe.getMultiplier()
                 ));
             } catch (Exception e) {
                 log.error("Error al calcular el insumo ID: {} para el producto ID: {}. Motivo: {}",
@@ -108,14 +117,22 @@ public class PackagingCostServiceImpl implements PackagingCostService {
                 Supply supply = recipe.getSupply();
                 if (!supply.getActive()) continue;
 
-                BigDecimal quantityNeeded = calculateQuantity(product, recipe); // Tu método privado actual
-                BigDecimal currentCpp = getValidUnitCost(supply);               // Tu método privado actual
+                BigDecimal quantityNeeded = calculateQuantity(product, recipe);
+                BigDecimal currentCpp = getValidUnitCost(supply);
                 BigDecimal itemTotalCost = quantityNeeded.multiply(currentCpp).setScale(2, RoundingMode.HALF_UP);
 
                 totalPackagingCost = totalPackagingCost.add(itemTotalCost);
+
+                // 🔥 CORRECCIÓN: Se añaden los 2 parámetros faltantes (calculationType y multiplier)
                 breakdown.add(new PackagingBreakdownDTO(
-                        supply.getId(), supply.getName(), supply.getUnitMeasure(),
-                        quantityNeeded.setScale(4, RoundingMode.HALF_UP), currentCpp, itemTotalCost
+                        supply.getId(),
+                        supply.getName(),
+                        supply.getUnitMeasure(),
+                        quantityNeeded.setScale(4, RoundingMode.HALF_UP),
+                        currentCpp,
+                        itemTotalCost,
+                        recipe.getCalculationType(),
+                        recipe.getMultiplier()
                 ));
             }
 
@@ -125,6 +142,43 @@ public class PackagingCostServiceImpl implements PackagingCostService {
         return packagingMap;
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = {"productDetails", "products", "productSummary"}, allEntries = true)
+    public void updatePackagingRecipes(Long productId, List<PackagingRecipeItemDTO> recipeItems) {
+        log.info("Actualizando receta de empaque para el producto ID: {}", productId);
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con ID: " + productId));
+
+        // 1. Limpiamos la receta anterior
+        recipeRepository.deleteByProductId(product.getId());
+
+        // Si mandan lista vacía, significa que quitaron todos los empaques
+        if (recipeItems == null || recipeItems.isEmpty()) {
+            return;
+        }
+
+        // 2. Construimos la nueva receta verificando que los insumos existan
+        List<ProductPackagingRecipe> newRecipes = new ArrayList<>();
+
+        for (PackagingRecipeItemDTO item : recipeItems) {
+            Supply supply = supplyRepository.findById(item.supplyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Insumo no encontrado con ID: " + item.supplyId()));
+
+            newRecipes.add(ProductPackagingRecipe.builder()
+                    .product(product)
+                    .supply(supply)
+                    .calculationType(item.calculationType())
+                    .multiplier(item.multiplier())
+                    .build());
+        }
+
+        // 3. Guardamos
+        recipeRepository.saveAll(newRecipes);
+        log.info("Receta de empaque actualizada correctamente con {} insumos.", newRecipes.size());
+    }
+
     private BigDecimal calculateQuantity(Product product, ProductPackagingRecipe recipe) {
         BigDecimal multiplier = recipe.getMultiplier();
 
@@ -132,21 +186,27 @@ public class PackagingCostServiceImpl implements PackagingCostService {
             case FIJO -> multiplier;
             case AREA_CM2 -> {
                 validateDimensions(product);
-                // Área total = 2 * (L*W + L*H + W*H)
+                // Área total en cm2 = 2 * (L*W + L*H + W*H)
                 BigDecimal lw = product.getLength().multiply(product.getWidth());
                 BigDecimal lh = product.getLength().multiply(product.getHeight());
                 BigDecimal wh = product.getWidth().multiply(product.getHeight());
-                BigDecimal area = lw.add(lh).add(wh).multiply(BigDecimal.valueOf(2));
-                yield area.multiply(multiplier);
+                BigDecimal areaCm2 = lw.add(lh).add(wh).multiply(BigDecimal.valueOf(2));
+
+                // 🔥 CORRECCIÓN: Convertir cm² a Metros Cuadrados (m²) dividiendo por 10.000
+                BigDecimal areaM2 = areaCm2.divide(BigDecimal.valueOf(10000), 6, RoundingMode.HALF_UP);
+                yield areaM2.multiply(multiplier);
             }
             case PERIMETRO_CM -> {
                 validateDimensions(product);
-                // Perímetro volumétrico base = 2 * (L + W + H)
-                BigDecimal perimeter = product.getLength()
+                // Perímetro en cm = 2 * (L + W + H)
+                BigDecimal perimeterCm = product.getLength()
                         .add(product.getWidth())
                         .add(product.getHeight())
                         .multiply(BigDecimal.valueOf(2));
-                yield perimeter.multiply(multiplier);
+
+                // 🔥 CORRECCIÓN: Convertir cm a Metros Lineales (m) dividiendo por 100
+                BigDecimal perimeterM = perimeterCm.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
+                yield perimeterM.multiply(multiplier);
             }
         };
     }

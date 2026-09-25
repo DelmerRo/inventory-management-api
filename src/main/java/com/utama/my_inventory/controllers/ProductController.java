@@ -6,6 +6,7 @@ import com.utama.my_inventory.dtos.request.QuickProductRequestDTO;
 import com.utama.my_inventory.dtos.request.SupplierAssociationDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockEntryRequestDTO;
 import com.utama.my_inventory.dtos.request.inventory.StockExitRequestDTO;
+import com.utama.my_inventory.dtos.request.product.PackagingRecipeItemDTO;
 import com.utama.my_inventory.dtos.response.SupplierAssociationResponseDTO;
 import com.utama.my_inventory.dtos.response.product.PagedProductResponseDTO;
 import com.utama.my_inventory.dtos.response.product.ProductDetailResponseDTO;
@@ -18,9 +19,9 @@ import com.utama.my_inventory.entities.Product;
 import com.utama.my_inventory.repositories.ProductRepository;
 import com.utama.my_inventory.services.InventoryService;
 import com.utama.my_inventory.services.MultimediaService;
+import com.utama.my_inventory.services.PackagingCostService;
 import com.utama.my_inventory.services.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -54,6 +55,7 @@ public class ProductController {
     private final ProductService productService;
     private final InventoryService inventoryService;
     private final MultimediaService multimediaService;
+    private final PackagingCostService packagingCostService;
     private final ProductRepository productRepository; // Solo para debug
 
     // Helper para crear Pageable con validación de campo de ordenamiento
@@ -343,5 +345,23 @@ public class ProductController {
                 ))
                 .collect(Collectors.toList()));
         return ResponseEntity.ok(debug);
+    }
+
+    @PutMapping("/{id}/packaging")
+    public ResponseEntity<ExtendedBaseResponse<ProductDetailResponseDTO>> updatePackagingRecipe(
+            @PathVariable Long id,
+            @Valid @RequestBody List<PackagingRecipeItemDTO> recipes) {
+
+        // 1. Guardamos la nueva receta
+        packagingCostService.updatePackagingRecipes(id, recipes);
+
+        // 2. Traemos el detalle actualizado (que automáticamente calculará el nuevo costo total)
+        ProductDetailResponseDTO updatedProduct = productService.getProductDetailById(id);
+
+        // 3. Usamos tu estructura estándar ExtendedBaseResponse
+        return ExtendedBaseResponse.ok(
+                updatedProduct,
+                "Receta de empaque actualizada correctamente"
+        ).toResponseEntity();
     }
 }

@@ -3,6 +3,7 @@ package com.utama.my_inventory.repositories;
 
 import com.utama.my_inventory.entities.ProductPackagingRecipe;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,4 +20,8 @@ public interface ProductPackagingRecipeRepository extends JpaRepository<ProductP
 
     @Query("SELECT r FROM ProductPackagingRecipe r JOIN FETCH r.supply WHERE r.product.id IN :productIds")
     List<ProductPackagingRecipe> findByProductIdInWithSupplies(@Param("productIds") List<Long> productIds);
+
+    @Modifying
+    @Query("DELETE FROM ProductPackagingRecipe r WHERE r.product.id = :productId")
+    void deleteByProductId(@Param("productId") Long productId);
 }
